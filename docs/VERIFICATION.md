@@ -152,3 +152,12 @@ Updated English and Chinese extension names and descriptions to describe multi-s
 ## Chrome Web Store replacement preparation
 
 Production lint, typecheck, 49 unit tests and all 37 Chromium scenarios passed. The supplied review OpenKey connected successfully and created private HN/arXiv notes and a Bilibili note with one finalized image; GET verified contents and attachment counts. Screenshots came from real public pages in disposable Chromium. No review credential is included in the repository or packages.
+
+
+### Store submission result
+
+The additional old published text-cache scenario passed, bringing browser coverage to 38 scenarios (37 full-suite plus the targeted upgrade check). Final lint and typecheck passed. A generic webpage capture also created a verified private note through the registered context-menu handler in disposable Chromium; this checks the pipeline, not the OS menu gesture. Production artifacts were scanned for real test credentials, remote executable imports, eval and Function constructors.
+
+On September 7, 2026, version 0.4.4 was uploaded to existing item cahpbdbfdfnmoachkjmcfgbbnmjcbpej. The first listing submission received Yellow Argon for excessive platform keywords. Both descriptions were rewritten around functionality without platform lists, then resubmitted successfully. The dashboard showed Pending review, with automatic publication after approval selected. This is not a claim of review approval.
+
+The new public repository is Rabithua/rote-extension. Old repository Rabithua/Rote_chromeExtension was backed up locally (Git mirror, issues/comments, PRs/reviews/commits/files and metadata), deleted with explicit user authorization, and verified as HTTP 404.
