@@ -148,6 +148,7 @@ export class XAdapter implements SiteAdapter {
     this.row.setAttribute('aria-disabled', String(busy || task.status === 'saved'));
   }
   update(task: TaskView) {
+    if (task.site !== 'x') return;
     this.updateRow(task);
     if (task.sourceId !== this.watchedSource) return;
     const key = task.status === 'saved' ? 'saved' : task.status === 'uncertain' ? 'create_uncertain'

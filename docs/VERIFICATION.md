@@ -65,3 +65,13 @@ lint、类型检查、26 项单元测试、11 项 Chromium 测试及构建通过
 通过当前菜单所在浮层的 mask 点击调用宿主关闭行为；没有 mask 时向原生菜单项发送带 keyCode/which 的 Escape。取消在 Escape 捕获阶段直接移除 Rote 行，由宿主菜单移除后清理。
 
 26 项单元测试、12 项 Playwright Chromium 测试、lint、类型检查和生产构建通过。模拟菜单改为由遮罩点击或 numeric Escape 关闭，不再接受 body.click；验证鼠标与键盘保存、正文折叠拒绝、上传等待期间整个菜单关闭、焦点返回和重新打开后的已保存状态。新增无遮罩的键盘关闭回退测试。本轮未在真实登录 X 页面复验，模拟验收不能替代真实站点验收。
+
+## 0.2.0 GitHub capture and independent columns
+
+Public GitHub repository homepages now have a Save to Rote button beside Star. Notes contain only repository name, description when present, and URL. Capture types, task IDs, status queries, notifications, and sender validation distinguish X and GitHub. GitHub uses the existing defaults and optional GitHub platform tag.
+
+Desktop settings use viewport height with independent column scrolling, a fixed brand and sticky activity title. Short windows allow the settings column to scroll to its submit button. At 800px and below the document uses a single scrolling column.
+
+Validation: lint, typecheck, production build, 31 unit tests and all 16 Chromium scenarios passed across the full regression and targeted reruns. GitHub coverage includes missing descriptions, private/unknown visibility exclusion, navigation and remounting, deduplication, tags, failed-create recovery, keyboard Enter, Chinese dark theme, and visible corner clicks at 125% zoom. Layout coverage includes independent scrolling, 600px height, and 360px width.
+
+Live validation on the signed-out octocat/Hello-World GitHub page: injected and adjacent native buttons measured 28px high; light-theme screenshot inspected. Clicking the extension button created private note 51eb42ba-4984-4854-a64d-e6f9babddf22 on api.rote.ink. GET confirmed exact repository name, description and link. Issues pages had no button; returning home showed Saved to Rote. Live dark-theme inspection used an attribute change; complete dark interaction coverage uses the local fixture. Logged-in GitHub UI variants were not directly tested.

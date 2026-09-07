@@ -20,6 +20,7 @@ export interface SaveTask {
   uploaded: string[];
 }
 export interface TaskView {
+  site: CaptureItem['site'];
   id: string;
   sourceId: string;
   sourceUrl: string;
@@ -34,8 +35,8 @@ export interface TaskView {
   uploadedCount: number;
 }
 export function taskView(task: SaveTask): TaskView {
-  return { id: task.id, sourceId: task.capture.sourceId, sourceUrl: task.capture.sourceUrl,
-    author: task.capture.author.name, excerpt: task.capture.text.slice(0,140), status: task.status,
+  return { site: task.capture.site, id: task.id, sourceId: task.capture.sourceId, sourceUrl: task.capture.sourceUrl,
+    author: task.capture.site === 'github' ? task.capture.repository : task.capture.author.name, excerpt: task.capture.text.slice(0,140), status: task.status,
     updatedAt: task.updatedAt, noteId: task.noteId, error: task.error,
     permissionOrigin: task.permissionOrigin, imageCount: task.capture.images.length,
     uploadedCount: Math.max(task.uploaded.length, task.finalized.length) };

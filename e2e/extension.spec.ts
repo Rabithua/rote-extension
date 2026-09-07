@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { xFixture } from './x-fixture';
+import { githubFixture } from './github-fixture';
 
 const test=base.extend<{context:BrowserContext;extensionId:string}>({
   context:async ({playwright},use)=>{
@@ -204,4 +205,74 @@ test('persists the platform tag switch and applies it only to new captures',asyn
   await expect(settings.getByText('已保存到 Rote',{exact:true})).toHaveCount(2);
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(state.data.notes[0].tags).toEqual(['阅读','X']);expect(state.data.notes[1].tags).toEqual(['阅读']);
+});
+
+test('GitHub saves summary with tags, deduplicates and follows repository navigation',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);
+  await settings.getByRole('switch').click();await settings.locator('button[type=submit]').click();
+  await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubFixture(new URL(route.request().url()).pathname.slice(1),true,'A useful project')}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  const button=page.locator('[data-rote-github] button');await expect(button).toHaveText('Save to Rote');
+  expect((await button.boundingBox())!.height).toBe((await page.getByRole('button',{name:'Star',exact:true}).boundingBox())!.height);
+  await button.click({position:{x:2,y:2}});await expect(button).toHaveText('Saved to Rote');await expect(button).toBeDisabled();
+  expect(await page.locator('body').getAttribute('data-star-clicked')).toBeNull();
+  await expect(settings.getByRole('link',{name:'Open project'})).toBeVisible();
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
+  expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].content).toBe('Owner/Repo\n\nA useful project\n\nhttps://github.com/Owner/Repo');expect(state.data.notes[0].tags).toEqual(['GitHub']);
+  await page.reload();await expect(button).toHaveText('Saved to Rote');
+  await page.evaluate(()=>{
+    history.pushState({},'', '/Other/Project');
+    document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Project');
+    const actions=document.querySelector('.pagehead-actions')!;actions.replaceWith(actions.cloneNode(true));
+    document.querySelector('[data-rote-github]')?.remove();
+    document.dispatchEvent(new Event('turbo:load'));
+  });
+  await expect(button).toHaveCount(1);await expect(button).toHaveText('Save to Rote');
+  await page.evaluate(()=>{history.pushState({},'', '/Other/Project/issues');document.dispatchEvent(new Event('turbo:load'));});
+  await expect(button).toHaveCount(0);
+});
+test('GitHub excludes private repos and recovers failed creation from settings',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubFixture('Owner/Repo',false)}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');await expect(page.locator('[data-rote-github]')).toHaveCount(0);
+  await page.evaluate(()=>{document.querySelector('meta[name$="_public"]')!.setAttribute('content','true');document.querySelector('p')!.textContent='';document.dispatchEvent(new Event('turbo:load'));});
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'create403'}});
+  await page.locator('[data-rote-github] button').click();await expect(settings.getByRole('button',{name:'Retry',exact:true})).toBeVisible();
+  await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('[data-rote-github] button')).toHaveText('Saved to Rote');
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes[0].content).toBe('Owner/Repo\n\nhttps://github.com/Owner/Repo');
+});
+test('desktop columns scroll independently and narrow windows use document scrolling',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId,'zh');await settings.setViewportSize({width:1100,height:600});
+  await settings.locator('#theme').selectOption('dark');
+  await settings.locator('button[type=submit]').click();await expect(settings.locator('html')).toHaveClass('dark');
+  await settings.evaluate(()=>{
+    const list=document.querySelector('.activity-column .section')!;
+    for(let i=0;i<30;i++){const row=document.createElement('article');row.className='task';row.textContent='Recent capture '+i;row.style.height='80px';list.append(row);}
+  });
+  const left=await settings.locator('.settings-column').boundingBox();
+  await settings.locator('.activity-column').evaluate(el=>{el.scrollTop=600;});
+  expect(await settings.locator('.activity-column').evaluate(el=>el.scrollTop)).toBe(600);
+  expect(await settings.locator('.settings-column').boundingBox()).toEqual(left);
+  expect(await settings.evaluate(()=>window.scrollY)).toBe(0);
+  await settings.locator('button[type=submit]').scrollIntoViewIfNeeded();await expect(settings.locator('button[type=submit]')).toBeInViewport();
+  await mkdir('test-results/visuals',{recursive:true});await settings.screenshot({path:'test-results/visuals/columns-dark-zh.png'});
+  await settings.setViewportSize({width:360,height:600});
+  expect(await settings.locator('.activity-column').evaluate(el=>getComputedStyle(el).overflowY)).toBe('visible');
+  expect(await settings.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('GitHub dark Chinese button supports keyboard and bottom corner clicks at zoom',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubFixture('Owner/Repo',true,'Description',true).replace('lang="en"','lang="zh"')}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  await page.evaluate(()=>{document.body.style.zoom='1.25';});
+  const button=page.locator('[data-rote-github] button');await expect(button).toHaveText('保存到 Rote');
+  await button.focus();await expect(button).toBeFocused();
+  await mkdir('test-results/visuals',{recursive:true});await page.screenshot({path:'test-results/visuals/github-dark-zh.png'});
+  const box=await button.boundingBox();if(!box)throw Error('missing button');
+  // Four pixels inward is inside the visible rounded corner at 125% zoom.
+  await page.mouse.click(box.x+box.width-4,box.y+box.height-4);await expect(button).toHaveText('已保存到 Rote');
+  await page.evaluate(()=>{history.pushState({},'', '/Other/Repo');document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Repo');document.dispatchEvent(new Event('turbo:load'));});
+  await expect(button).toHaveText('保存到 Rote');await button.focus();await page.keyboard.press('Enter');await expect(button).toHaveText('已保存到 Rote');
 });

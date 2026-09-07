@@ -4,7 +4,7 @@ import type { Settings, SettingsInput } from '../settings/store';
 
 export type Request =
   | { type: 'capture'; capture: CaptureItem }
-  | { type: 'status'; sourceId: string }
+  | { type: 'status'; site: CaptureItem['site']; sourceId: string }
   | { type: 'open-settings' }
   | { type: 'settings:get' }
   | { type: 'settings:save'; settings: SettingsInput }

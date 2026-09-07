@@ -1,8 +1,8 @@
 {
   "extensionName": {
-    "message": "Rote — Save from X"
+    "message": "Rote — Save from X & GitHub"
   },
   "extensionDescription": {
-    "message": "Save posts and images to Rote from the share menu on X."
+    "message": "Save X posts and public GitHub projects to Rote."
   }
 }

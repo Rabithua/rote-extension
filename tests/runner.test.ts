@@ -117,3 +117,14 @@ it('keeps capture-time defaults after settings change and uses private for legac
   await h.runner.start(legacy.id);
   expect(h.client.createNote).toHaveBeenLastCalledWith(legacy.capture,{tags:[],visibility:'private'});
 });
+
+it('keeps platform task identities separate and deduplicates GitHub captures', async () => {
+  const { runner, tasks } = harness();
+  const github = { site:'github' as const, repository:'Owner/Repo', sourceId:'owner/repo', sourceUrl:'https://github.com/Owner/Repo', text:'Description', images:[], complete:true as const, capturedAt:new Date().toISOString() };
+  const x = await runner.enqueue(capture(), settings);
+  const a = await runner.enqueue(github, settings);
+  const b = await runner.enqueue(github, settings);
+  expect(a.id).toBe('account-a:github:owner/repo');
+  expect(x.id).toBe('account-a:x:123');
+  expect(a.id).toBe(b.id);expect(tasks.size).toBe(2);
+});

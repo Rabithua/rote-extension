@@ -12,3 +12,5 @@
 附件上传依次执行 presign → PUT → finalize；持久化 UUID 和笔记 ID。服务端附件数据库 ID 与上传 UUID 不同，通过对象文件名匹配上传身份。依次 finalize 形成稳定创建顺序，并在最终 GET 中核对附件顺序。
 
 框架：[WXT](https://wxt.dev/)，浏览器网络模型：[Chrome Extensions](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)。具体依赖版本由 `bun.lock` 锁定。
+
+GitHub uses the host's btn / btn-sm and flash classes without global CSS injection. Public visibility and repository identity come from page octolytics metadata; description comes from the About text node. Verified against octocat/Hello-World on 2026-09-07. Independent viewport-height scrolling follows Rote SideContentLayout behavior while retaining the extension's existing column proportions.

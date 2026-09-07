@@ -10,7 +10,7 @@ import type { Reply, ResponseData } from './protocol';
 
 const requestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('capture'), capture: captureSchema }),
-  z.object({ type: z.literal('status'), sourceId: z.string().regex(/^\d+$/) }),
+  z.object({ type: z.literal('status'), site: z.enum(['x','github']), sourceId: z.string().min(1).max(200) }),
   z.object({ type: z.literal('open-settings') }),
   z.object({ type: z.literal('settings:get') }),
   z.object({ type: z.literal('settings:save'), settings: settingsSchema }),
@@ -24,7 +24,7 @@ export function isTrustedPage(sender: chrome.runtime.MessageSender): boolean {
 function changed(task: SaveTask) {
   void chrome.runtime.sendMessage({ type: 'task:changed', task: taskView(task) }).catch(() => undefined);
   // Never include credentials or signed upload URLs in content-script notifications.
-  void chrome.tabs.query({ url: 'https://x.com/*' }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
+  void chrome.tabs.query({ url: task.capture.site === 'x' ? 'https://x.com/*' : 'https://github.com/*' }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
     : chrome.tabs.sendMessage(tab.id, { type: 'task:changed', task: taskView(task) }).catch(() => undefined))));
 }
 export function installBackground() {
@@ -38,7 +38,7 @@ export function installBackground() {
     if (sender.id !== chrome.runtime.id) throw new Error('not_allowed');
     const request = requestSchema.parse(raw);
     const trusted = isTrustedPage(sender);
-    if (!trusted && !(sender.tab && sender.frameId === 0 && sender.url?.startsWith('https://x.com/') && ['capture','status','open-settings'].includes(request.type))) throw new Error('not_allowed');
+    if (!trusted && !isSiteRequestAllowed(sender, request)) throw new Error('not_allowed');
     const settings = await readSettings();
     if (request.type === 'open-settings') { await chrome.runtime.openOptionsPage(); return {}; }
     if (request.type === 'settings:get') return { settings };
@@ -58,7 +58,7 @@ export function installBackground() {
       return { task: taskView(task) };
     }
     if (request.type === 'status') {
-      const task = await taskStore.get(`${settings.id}:x:${request.sourceId}`);
+      const task = await taskStore.get(`${settings.id}:${request.site}:${request.sourceId}`);
       return { task: task ? taskView(task) : undefined };
     }
     if (request.type === 'tasks:list') return { tasks: (await taskStore.list(settings.id)).map(taskView) };
@@ -81,4 +81,13 @@ export function installBackground() {
   chrome.runtime.onInstalled.addListener(() => { void chrome.alarms.create('resume-captures', { periodInMinutes: 1 }); });
   void chrome.alarms.create('resume-captures', { periodInMinutes: 1 });
   recover();
+}
+
+export function isSiteRequestAllowed(sender: chrome.runtime.MessageSender, request: z.infer<typeof requestSchema>): boolean {
+  if (!sender.tab || sender.frameId !== 0 || !sender.url) return false;
+  const origin = new URL(sender.url).origin;
+  const site = origin === 'https://x.com' ? 'x' : origin === 'https://github.com' ? 'github' : undefined;
+  if (!site) return false;
+  return request.type === 'open-settings' || (request.type === 'capture' && request.capture.site === site)
+    || (request.type === 'status' && request.site === site);
 }

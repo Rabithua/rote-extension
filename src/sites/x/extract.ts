@@ -1,4 +1,4 @@
-import { captureSchema, type CaptureItem } from '../../domain/capture';
+import { xCaptureSchema, type CaptureItem } from '../../domain/capture';
 
 const QUOTE = '[data-testid="quoteTweet"], div[role="link"], [data-testid="card.wrapper"]';
 export function ownElements<T extends Element>(article: Element, selector: string): T[] {
@@ -26,7 +26,7 @@ function readText(element: Element): string {
   copy.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
   return copy.textContent?.trim() ?? '';
 }
-export function extractPost(article: Element): CaptureItem {
+export function extractPost(article: Element): Extract<CaptureItem, { site: 'x' }> {
   const textElements = ownElements<HTMLElement>(article, '[data-testid="tweetText"]');
   const more = ownElements<HTMLElement>(article, '[data-testid="tweet-text-show-more-link"], button, a').some(element =>
     element.matches('[data-testid="tweet-text-show-more-link"]') || /^(Show more|显示更多|顯示更多)$/.test(element.textContent?.trim() ?? ''));
@@ -54,7 +54,7 @@ export function extractPost(article: Element): CaptureItem {
     .map(link => canonicalPost(link.getAttribute('href') ?? '')?.url).find(url => url && url !== source.url);
   const text = textElements.map(readText).filter(Boolean).join('\n\n');
   if (!text && !images.length) throw new Error('empty_capture');
-  const result = captureSchema.safeParse({ site: 'x', sourceId: source.id, sourceUrl: source.url,
+  const result = xCaptureSchema.safeParse({ site: 'x', sourceId: source.id, sourceUrl: source.url,
     author: { name, handle }, publishedAt: new Date(timestamp.dateTime).toISOString(), text,
     images: images.filter((image,index) => images.findIndex(other => other.url === image.url) === index),
     quotedUrl, complete: true, capturedAt: new Date().toISOString() });

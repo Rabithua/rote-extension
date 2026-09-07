@@ -22,7 +22,7 @@ export class SaveRunner {
   constructor(private deps: RunnerDependencies) {}
   enqueue(capture: CaptureItem, settings: Settings): Promise<SaveTask> {
     const operation = this.enqueueTail.then(async () => {
-      const id = `${settings.id}:x:${capture.sourceId}`;
+      const id = `${settings.id}:${capture.site}:${capture.sourceId}`;
       const existing = await this.deps.store.get(id);
       if (existing) return existing;
       const now = new Date().toISOString();
