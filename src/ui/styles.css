@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -137,6 +138,8 @@ body { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; }
 .section { margin:0; }
 .section h2 { font-size:16px; font-weight:600; margin:0 0 12px; }
 .field { display:grid; gap:6px; margin-bottom:14px; }
+.platform-tag-toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.platform-tag-toggle label { flex:1; cursor:pointer; }
 .field label { font-weight:500; }
 .hint { color:var(--muted-foreground); font-size:12px; line-height:1.6; margin:0; }
 .preferences { display:grid; grid-template-columns:1fr 1fr; gap:16px; }

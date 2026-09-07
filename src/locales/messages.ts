@@ -1,4 +1,6 @@
 export const en = {
+  addPlatformTag: 'Add platform tag automatically', platformTagHint: 'Add X when capturing from X; duplicate tags are added only once.',
+  tag_limit: 'Up to 20 tags including the platform tag. Remove a default tag or turn this option off.',
   defaultTags: 'Default tags', tagsHint: 'Separate tags with commas. Leave blank for no tags. Up to 20 tags, 50 characters each.',
   defaultVisibility: 'Default visibility', visibilityPrivate: 'Private', visibilityPublic: 'Public',
   privateHint: 'New captures are visible only to you.', publicHint: 'New captures will be public in Rote.',
@@ -34,6 +36,8 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const zh: Record<MessageKey, string> = {
+  addPlatformTag: '自动添加平台标签', platformTagHint: '采集 X 帖子时添加 X 标签，与默认标签去重。',
+  tag_limit: '包含平台标签在内最多 20 个标签，请减少默认标签或关闭此选项。',
   defaultTags: '默认标签', tagsHint: '多个标签用逗号分隔，留空则不添加；最多 20 个标签，每个最多 50 个字符。',
   defaultVisibility: '默认可见性', visibilityPrivate: '私密', visibilityPublic: '公开',
   privateHint: '新采集的笔记仅自己可见。', publicHint: '新采集的笔记将在 Rote 中公开可见。',

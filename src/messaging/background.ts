@@ -72,7 +72,7 @@ export function installBackground() {
     if (!raw || typeof raw !== 'object' || !('type' in raw) || raw.type === 'task:changed') return false;
     void handle(raw, sender).then(data => reply({ ok: true, data }), error => reply({ ok: false, error:
       error instanceof ApiFailure ? `api_${error.status}` : error instanceof z.ZodError ? 'invalid_input'
-        : error instanceof Error && ['not_allowed','host_permission','missing_permissions','not_configured','invalid_address'].includes(error.message) ? error.message : 'save_failed' }));
+        : error instanceof Error && ['not_allowed','host_permission','missing_permissions','not_configured','invalid_address','tag_limit'].includes(error.message) ? error.message : 'save_failed' }));
     return true;
   });
   const recover = () => { void ready.then(() => runner.recover()).catch(() => chrome.action.setBadgeText({ text: '!' })); };

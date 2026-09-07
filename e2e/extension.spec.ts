@@ -172,3 +172,23 @@ test('registers a toolbar action without a popup and opens standalone settings',
   const page=context.pages().find(page=>page.url().endsWith('/options.html'))!;
   await expect(page.locator('#defaultTags')).toBeVisible();
 });
+test('persists the platform tag switch and applies it only to new captures',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId,'zh');const toggle=settings.getByRole('switch',{name:'自动添加平台标签'});
+  await expect(toggle).not.toBeChecked();
+  await toggle.click({position:{x:4,y:4}});await expect(toggle).toBeChecked();
+  await settings.locator('label[for=addPlatformTag]').click();await expect(toggle).not.toBeChecked();
+  await toggle.focus();await settings.keyboard.press('Space');await expect(toggle).toBeChecked();
+  await settings.locator('#defaultTags').fill('阅读');await settings.locator('button[type=submit]').click();
+  await expect(settings.locator('button[type=submit]')).toBeEnabled();await settings.reload();
+  await expect(settings.getByRole('switch')).toBeChecked();
+  const page=await openX(context);
+  await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
+  await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
+  const box=await settings.getByRole('switch').boundingBox();if(!box)throw Error('Switch missing');
+  await settings.getByRole('switch').click({position:{x:box.width-4,y:box.height-4}});
+  await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
+  await expect(settings.getByText('已保存到 Rote',{exact:true})).toHaveCount(2);
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
+  expect(state.data.notes[0].tags).toEqual(['阅读','X']);expect(state.data.notes[1].tags).toEqual(['阅读']);
+});

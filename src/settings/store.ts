@@ -6,6 +6,7 @@ export const settingsSchema = z.object({
   language: z.enum(['system', 'zh', 'en']),
   theme: z.enum(['system', 'light', 'dark']),
   defaultTags: z.array(z.string().trim().min(1).max(50)).max(20).transform(tags => [...new Set(tags)]).default([]),
+  addPlatformTag: z.boolean().default(false),
   defaultVisibility: z.enum(['private', 'public']).default('private'),
 });
 export const storedSettingsSchema = settingsSchema.extend({ id: z.string() });
