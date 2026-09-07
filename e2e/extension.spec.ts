@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { xFixture } from './x-fixture';
+import { youtubeFixture } from './youtube-fixture';
 import { githubFixture } from './github-fixture';
 
 const test=base.extend<{context:BrowserContext;extensionId:string}>({
@@ -16,7 +17,7 @@ const test=base.extend<{context:BrowserContext;extensionId:string}>({
       channel:'chromium',headless:true,viewport:{width:1100,height:850},
       args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`],
     });
-    await context.route('https://pbs.twimg.com/**',route=>route.fulfill({status:200,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64')}));
+    await context.route(/https:\/\/(pbs\.twimg\.com|i\.ytimg\.com)\/.*/, route=>route.fulfill({status:200,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64')}));
     await context.request.post('http://127.0.0.1:43119/__reset');
     await use(context);await context.close();await rm(folder,{recursive:true,force:true});
   },
@@ -346,4 +347,48 @@ test('X and GitHub share Rote toast styling, success dismissal and recovery cont
   await github.locator('[data-rote-github] button').click();await expect(toast.getByRole('button',{name:'Open settings'})).toBeVisible();
   await github.setViewportSize({width:360,height:600});expect(await github.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await toast.getByRole('button',{name:'Close',exact:true}).click({position:{x:2,y:2}});await expect(toast).toHaveCount(0);
+});
+
+test('YouTube card menus and watch buttons share a video task with its cover',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);await settings.getByRole('switch').click();await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeFixture(new URL(route.request().url()).pathname==='/watch')}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/');
+  await page.getByRole('button',{name:'More actions'}).first().click();
+  const row=page.locator('[data-rote-youtube=menu]');await expect(row).toHaveText('Save to Rote');
+  await page.keyboard.press('End');await expect(row).toBeFocused();await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);expect(state.data.notes[0].tags).toEqual(['YouTube']);expect(state.data.notes[0].content).toContain('Full video title\n\nTest Channel');
+  await page.goto('https://www.youtube.com/watch?v=abcdefghijk');const button=page.locator('[data-rote-youtube=watch]');await expect(button).toHaveText('Saved to Rote');await expect(button).toBeDisabled();
+  await expect(settings.getByRole('link',{name:'Open video'})).toBeVisible();
+  await page.getByRole('button',{name:'More actions'}).nth(1).click();await expect(row).toHaveText('Save to Rote');await row.click({position:{x:3,y:3}});await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(2);
+});
+test('YouTube watch captures survive cover upload failures and SPA navigation rejects stale metadata',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeFixture(true)}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/watch?v=abcdefghijk');const button=page.locator('[data-rote-youtube=watch]');await expect(button).toBeVisible();
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});await button.click();await expect(settings.getByText('Text saved. Images need attention.',{exact:true})).toBeVisible();
+  await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(button).toHaveText('Saved to Rote');
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
+  await page.evaluate(()=>{document.dispatchEvent(new Event('yt-navigate-start'));history.pushState({},'', '/watch?v=lmnopqrstuv');document.dispatchEvent(new Event('yt-navigate-finish'));});await expect(button).toHaveCount(0);
+  await page.evaluate(()=>{document.querySelector('ytd-watch-flexy')!.setAttribute('video-id','lmnopqrstuv');document.querySelector('ytd-watch-metadata h1')!.textContent='Second video';});await expect(button).toHaveText('Save to Rote');await expect(button).toHaveCount(1);
+});
+
+test('YouTube modern fixed-height popup expands for the full injected row',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  let html=youtubeFixture();
+  html=html.replace("const menu=document.createElement('ytd-menu-popup-renderer')", "const menu=document.createElement('yt-list-view-model')");
+  html=html.replace("'<div role=\"menuitem\" tabindex=\"0\"><svg", "'<yt-list-item-view-model role=\"presentation\"><div class=\"ytListItemViewModelLayoutWrapper\" style=\"height:40px;box-sizing:border-box;padding:2px 16px\"><div role=\"menuitem\" tabindex=\"0\"><svg");
+  html=html.replace("'+text+'</span></div>'", "'+text+'</span></div></div></yt-list-item-view-model>'");
+  html=html.replace('document.body.append(menu);', 'const sheet=document.createElement("yt-sheet-view-model");sheet.style.cssText="display:block;position:fixed;top:200px;left:400px;max-height:80px;overflow:auto";sheet.append(menu);document.body.append(sheet);');
+  await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:html}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/');await page.getByRole('button',{name:'More actions'}).first().click();
+  const row=page.locator('[data-rote-youtube=menu]');await expect(row).toBeVisible();
+  const bounds=await row.boundingBox();const sheet=await page.locator('yt-sheet-view-model').boundingBox();expect(bounds!.height).toBe(40);expect(bounds!.y+bounds!.height).toBeLessThanOrEqual(sheet!.y+sheet!.height);
+});
+
+test('YouTube refuses a recycled card after its menu has opened',async({context,extensionId})=>{
+  await connect(context,extensionId);await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeFixture()}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/');await page.getByRole('button',{name:'More actions'}).first().click();await expect(page.locator('[data-rote-youtube=menu]')).toBeVisible();
+  await page.locator('yt-lockup-view-model a').first().evaluate(el=>el.setAttribute('href','/watch?v=lmnopqrstuv'));
+  await page.locator('[data-rote-youtube=menu]').click();await expect(page.getByRole('menu')).toHaveCount(0);
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(0);
 });

@@ -18,3 +18,5 @@ GitHub uses the host's btn / btn-sm and flash classes without global CSS injecti
 0.2.1 correction: use web/src/layout/dashboard/index.tsx as the sidebar reference (sticky sidebar and overflow-visible content). SideContentLayout is the separately scrolling auxiliary panel and is not the requested primary sidebar behavior.
 
 0.2.3: X and GitHub share CaptureToast in Shadow DOM. Its palette uses Rote popover / popover-foreground / border tokens, following web/src/components/ui/sonner.tsx. Bottom-center placement is the user's explicit choice; system color scheme is shared across sites. Native menu/button styling remains site-specific.
+
+0.3.0: YouTube adapter selectors and popup geometry were inspected from live www.youtube.com watch-page and recommendation-card DOM on 2026-09-07. Supports legacy renderers and ytLockupMetadataViewModelTitle / ytContentMetadataViewModelMetadataRow plus modern yt-sheet-view-model menus. Native button classes and measured menu layout are reused; Rote toast remains shared and isolated.

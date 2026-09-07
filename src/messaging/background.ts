@@ -10,7 +10,7 @@ import type { Reply, ResponseData } from './protocol';
 
 const requestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('capture'), capture: captureSchema }),
-  z.object({ type: z.literal('status'), site: z.enum(['x','github']), sourceId: z.string().min(1).max(200) }),
+  z.object({ type: z.literal('status'), site: z.enum(['x','github','youtube']), sourceId: z.string().min(1).max(200) }),
   z.object({ type: z.literal('open-settings') }),
   z.object({ type: z.literal('settings:get') }),
   z.object({ type: z.literal('settings:save'), settings: settingsSchema }),
@@ -24,7 +24,7 @@ export function isTrustedPage(sender: chrome.runtime.MessageSender): boolean {
 function changed(task: SaveTask) {
   void chrome.runtime.sendMessage({ type: 'task:changed', task: taskView(task) }).catch(() => undefined);
   // Never include credentials or signed upload URLs in content-script notifications.
-  void chrome.tabs.query({ url: task.capture.site === 'x' ? 'https://x.com/*' : 'https://github.com/*' }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
+  void chrome.tabs.query({ url: task.capture.site === 'x' ? 'https://x.com/*' : task.capture.site === 'github' ? 'https://github.com/*' : 'https://www.youtube.com/*' }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
     : chrome.tabs.sendMessage(tab.id, { type: 'task:changed', task: taskView(task) }).catch(() => undefined))));
 }
 export function installBackground() {
@@ -86,7 +86,7 @@ export function installBackground() {
 export function isSiteRequestAllowed(sender: chrome.runtime.MessageSender, request: z.infer<typeof requestSchema>): boolean {
   if (!sender.tab || sender.frameId !== 0 || !sender.url) return false;
   const origin = new URL(sender.url).origin;
-  const site = origin === 'https://x.com' ? 'x' : origin === 'https://github.com' ? 'github' : undefined;
+  const site = origin === 'https://x.com' ? 'x' : origin === 'https://github.com' ? 'github' : origin === 'https://www.youtube.com' ? 'youtube' : undefined;
   if (!site) return false;
   return request.type === 'open-settings' || (request.type === 'capture' && request.capture.site === site)
     || (request.type === 'status' && request.site === site);

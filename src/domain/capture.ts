@@ -35,9 +35,25 @@ export const githubCaptureSchema = z.object({
   if (item.sourceId !== item.repository.toLowerCase() || item.sourceUrl !== `https://github.com/${item.repository}`)
     ctx.addIssue({ code: 'custom', message: 'source_mismatch' });
 });
-export const captureSchema = z.discriminatedUnion('site', [xCaptureSchema, githubCaptureSchema]);
+export const youtubeCaptureSchema = z.object({
+  site: z.literal('youtube'),
+  sourceId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+  sourceUrl: z.string().url(),
+  title: z.string().trim().min(1).max(1000),
+  channel: z.string().trim().min(1).max(300),
+  text: z.literal(''),
+  images: z.array(z.object({ url: z.string().url(), alt: z.string().max(1000) })).length(1),
+  complete: z.literal(true),
+  capturedAt: z.string().datetime(),
+}).superRefine((item, ctx) => {
+  if (item.sourceUrl !== `https://www.youtube.com/watch?v=${item.sourceId}`
+    || item.images[0]?.url !== `https://i.ytimg.com/vi/${item.sourceId}/hqdefault.jpg`)
+    ctx.addIssue({ code: 'custom', message: 'source_mismatch' });
+});
+export const captureSchema = z.discriminatedUnion('site', [xCaptureSchema, githubCaptureSchema, youtubeCaptureSchema]);
 export type CaptureItem = z.infer<typeof captureSchema>;
 export function noteContent(item: CaptureItem): string {
+  if (item.site === 'youtube') return [item.title, item.channel, item.sourceUrl].join('\n\n');
   if (item.site === 'github') return [item.repository, item.text.trim(), item.sourceUrl].filter(Boolean).join('\n\n');
   return [item.text.trim(), `${item.author.name} (${item.author.handle})`, item.publishedAt, item.sourceUrl,
     item.quotedUrl].filter(Boolean).join('\n\n');

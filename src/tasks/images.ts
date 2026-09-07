@@ -4,7 +4,8 @@ export class MissingHostPermission extends Error {
 }
 export async function downloadImage(url: string): Promise<Blob> {
   const parsed = new URL(url);
-  if (parsed.origin !== 'https://pbs.twimg.com' || !parsed.pathname.startsWith('/media/')) throw new Error('invalid_image');
+  if (!(parsed.origin === 'https://pbs.twimg.com' && parsed.pathname.startsWith('/media/'))
+    && !(parsed.origin === 'https://i.ytimg.com' && /^\/vi\/[A-Za-z0-9_-]{11}\/hqdefault\.jpg$/.test(parsed.pathname))) throw new Error('invalid_image');
   const response = await fetch(url, { credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(25_000) });
   if (!response.ok) throw new Error('image_download');
   const type = response.headers.get('content-type')?.split(';')[0] ?? '';

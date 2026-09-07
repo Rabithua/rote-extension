@@ -11,7 +11,7 @@
 5. 刷新已经打开的 X 页面，打开某条帖子的分享菜单，点击「保存到 Rote」。
 6. 首次上传时，如果对象存储使用另一个域名，文字先保存；在「最近采集」点击授权并重试，只授予任务实际使用的上传域名。
 
-更新时替换原文件夹内容，然后在扩展管理页点击重新加载，并刷新 X / GitHub 页面；关闭升级前已打开的设置页，再点击工具栏 Rote 图标重新打开。不要删除扩展再安装，否则浏览器会清除本地配置和待恢复任务。
+更新时替换原文件夹内容，然后在扩展管理页点击重新加载，并刷新 X / GitHub / YouTube 页面；关闭升级前已打开的设置页，再点击工具栏 Rote 图标重新打开。不要删除扩展再安装，否则浏览器会清除本地配置和待恢复任务。
 
 ## 保存内容
 
@@ -49,7 +49,7 @@ bun run test:e2e
 bun run zip
 ```
 
-生产加载目录：`.output/chrome-mv3`。自动化使用真实 Chromium 加载生产构建，X / GitHub DOM 和 Rote API 在本地模拟；不会自动访问真实账户或创建线上笔记。
+生产加载目录：`.output/chrome-mv3`。自动化使用真实 Chromium 加载生产构建，X / GitHub / YouTube DOM 和 Rote API 在本地模拟；不会自动访问真实账户或创建线上笔记。
 
 ## 架构和权限
 
@@ -57,7 +57,7 @@ bun run zip
 
 OpenKey 只在扩展可信上下文存取，storage.local 设置 `TRUSTED_CONTEXTS`。不会注入网页，也不使用 Rote Cookie。GET OpenKey 参数遵循现有服务端协议，POST 放在 JSON 请求体。发布包不含任何账户配置或测试密钥。
 
-默认主机权限为 X、GitHub 与 `pbs.twimg.com`。可选 HTTPS 匹配范围用于运行时申请用户配置的具体服务/上传域名，不会在安装时获得所有站点权限。localhost HTTP 仅用于本地开发实例。
+默认主机权限为 X、GitHub、www.youtube.com，以及图片 CDN `pbs.twimg.com` 和 `i.ytimg.com`。可选 HTTPS 匹配范围用于运行时申请用户配置的具体服务/上传域名，不会在安装时获得所有站点权限。localhost HTTP 仅用于本地开发实例。
 
 网络请求均从扩展后台发出。有对应 host permissions 时通常无需修改 Rote 或对象存储 CORS。参见 [Chrome 跨域请求文档](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)。
 
@@ -74,3 +74,9 @@ OpenKey 只在扩展可信上下文存取，storage.local 设置 `TRUSTED_CONTEX
 ## 统一保存提示
 
 X 与 GitHub 使用同一套 Rote Toast：底部居中、保存状态原位更新、成功后 6 秒消失；失败或待核对时保留「打开设置」恢复入口。手动关闭后不会因同一任务更新再次弹出。提示颜色跟随系统深浅主题，样式隔离在 Shadow DOM 内。网站菜单和按钮仍使用各自原生样式。
+
+## YouTube 视频
+
+支持桌面 www.youtube.com 的视频卡片「⋮」菜单，以及播放页分享/保存旁的独立按钮。笔记包含完整视频标题、频道名称、规范视频链接和一张封面附件。使用视频 ID 去重，列表与播放页共享状态；不保存播放进度、播放列表参数、视频文件、字幕、简介或播放器广告。不支持 Shorts 专用页面。
+
+封面使用该视频的 hqdefault.jpg，经过现有附件上传及失败恢复流程。开启自动平台标签时添加 YouTube。安装更新后允许新增的 YouTube 与封面 CDN 权限，并刷新已打开的页面。

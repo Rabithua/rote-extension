@@ -33,7 +33,7 @@ export function TaskList({ tasks, t, reload, compact = false }: { tasks: TaskVie
         {task.error && !compact ? <p className="hint">{t(task.error)}</p> : null}
         {task.permissionOrigin ? <p className="hint">{t('permissionHint')}<br />{task.permissionOrigin}</p> : null}
         <div className="task-actions">
-          <a href={task.sourceUrl} target="_blank" rel="noreferrer" className="text-xs">{t(task.site === 'github' ? 'openProject' : 'openSource')}</a>
+          <a href={task.sourceUrl} target="_blank" rel="noreferrer" className="text-xs">{t(task.site === 'youtube' ? 'openVideo' : task.site === 'github' ? 'openProject' : 'openSource')}</a>
           {task.status === 'failed' ? <Button variant="outline" size="sm" disabled={busy === task.id} onClick={() => void act(task)}>{t(task.permissionOrigin ? 'grant' : 'retry')}</Button> : null}
           {task.status === 'uncertain' ? <Button variant="outline" size="sm" disabled={busy === task.id} onClick={() => void act(task,true)}>{t('reconcile')}</Button> : null}
         </div>
