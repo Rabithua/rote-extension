@@ -322,3 +322,28 @@ test('GitHub can locate the action group from the reported Unwatch and Star butt
   await expect(page.locator('[data-rote-github]')).toHaveCount(1);
   await button.click();await expect(button).toHaveText('Saved to Rote');
 });
+
+test('X and GitHub share Rote toast styling, success dismissal and recovery controls',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  const x=await openX(context);await x.emulateMedia({colorScheme:'dark'});
+  await x.getByRole('button',{name:'Share post'}).nth(1).click();await x.locator('[data-rote-capture]').click();
+  const xToast=x.locator('[data-rote-toast]');await expect(xToast.getByRole('status')).toContainText('Saved to Rote');
+  const visual=async(page:typeof x)=>page.locator('[data-rote-toast] .message').evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,color:s.color,padding:s.padding,border:s.border,radius:s.borderRadius,font:s.font};});
+  const xStyle=await visual(x);
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubFixture()}));
+  const github=await context.newPage();await github.emulateMedia({colorScheme:'dark'});await github.goto('https://github.com/Owner/Repo');
+  await expect(github.locator('[data-rote-toast]')).toHaveCount(0);
+  await github.locator('[data-rote-github] button').click();
+  const toast=github.locator('[data-rote-toast]');await expect(toast.getByRole('status')).toContainText('Saved to Rote');
+  expect(await visual(github)).toEqual(xStyle);
+  const bounds=await toast.boundingBox();expect(Math.abs(bounds!.x+bounds!.width/2-550)).toBeLessThan(1);
+  await mkdir('test-results/visuals',{recursive:true});await github.screenshot({path:'test-results/visuals/shared-toast-dark.png'});
+  await expect(toast).toHaveCount(0,{timeout:8000});
+  await github.reload();await expect(github.locator('[data-rote-github] button')).toHaveText('Saved to Rote');await expect(toast).toHaveCount(0);
+  await github.evaluate(()=>{history.pushState({},'', '/Other/Repo');document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Repo');document.dispatchEvent(new Event('turbo:load'));});
+  await expect(github.locator('[data-rote-github] button')).toHaveText('Save to Rote');
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'create403'}});
+  await github.locator('[data-rote-github] button').click();await expect(toast.getByRole('button',{name:'Open settings'})).toBeVisible();
+  await github.setViewportSize({width:360,height:600});expect(await github.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await toast.getByRole('button',{name:'Close',exact:true}).click({position:{x:2,y:2}});await expect(toast).toHaveCount(0);
+});

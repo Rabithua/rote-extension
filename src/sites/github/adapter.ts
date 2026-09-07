@@ -1,3 +1,4 @@
+import { CaptureToast } from '../toast';
 import type { TaskView } from '../../domain/task';
 import { languageFor, translate } from '../../locales/messages';
 import type { AdapterBridge, SiteAdapter } from '../adapter';
@@ -12,10 +13,11 @@ export class GitHubAdapter implements SiteAdapter {
   private wrapper?: HTMLElement;
   private button?: HTMLButtonElement;
   private label?: HTMLElement;
-  private message?: HTMLElement;
+  private toast: CaptureToast;
+  private watchedSource?: string;
   private sourceId?: string;
   private busy = false;
-  constructor(private bridge: AdapterBridge) {}
+  constructor(private bridge: AdapterBridge) { this.toast = new CaptureToast(key => this.t(key), () => this.bridge.openSettings()); }
   private t(key: string) { return translate(languageFor('system', document.documentElement.lang), key); }
   mount() {
     this.observer = new MutationObserver(this.schedule);
@@ -56,10 +58,11 @@ export class GitHubAdapter implements SiteAdapter {
       const fresh = extractRepository();
       if (!fresh || fresh.sourceId !== capture.sourceId) { this.refresh(); return; }
       this.busy = true; button.disabled = true; label.textContent = this.t('saving');
+      this.watchedSource = fresh.sourceId; this.toast.reset(); this.toast.show('saving');
       void this.bridge.save(fresh).then(task => { if (task) this.update(task); }, error => {
         if (this.button !== button) return;
         this.busy = false; button.disabled = false; label.textContent = this.t('save');
-        this.showMessage(error instanceof Error ? error.message : 'save_failed');
+        this.toast.show(error instanceof Error ? error.message : 'save_failed', true);
       });
     });
     void this.bridge.status(capture.sourceId).then(task => {
@@ -71,22 +74,11 @@ export class GitHubAdapter implements SiteAdapter {
     this.busy = ['queued','creating','uploading','finalizing'].includes(task.status);
     this.button.disabled = this.busy || task.status === 'saved' || task.status === 'uncertain';
     this.label.textContent = this.t(this.busy ? 'saving' : task.status === 'saved' ? 'saved' : task.status === 'uncertain' ? 'uncertain' : 'save');
-    if (task.status === 'failed' || task.status === 'uncertain') this.showMessage(task.error ?? 'save_failed');
-    else { this.message?.remove(); this.message = undefined; }
-  }
-  private showMessage(key: string) {
-    this.message?.remove();
-    const message = document.createElement('div'); message.className = 'flash flash-error'; message.setAttribute('role','status');
-    message.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:100;max-width:calc(100vw - 48px)';
-    const text = document.createElement('span'); text.textContent = this.t(key) + ' ';
-    const settings = document.createElement('button'); settings.type = 'button'; settings.className = 'btn-link'; settings.textContent = this.t('settingsLink');
-    settings.onclick = () => { void this.bridge.openSettings(); };
-    const close = document.createElement('button'); close.type = 'button'; close.className = 'btn-link'; close.textContent = ' ×'; close.setAttribute('aria-label', this.t('close'));
-    close.onclick = () => message.remove(); message.append(text,settings,close); document.body.append(message); this.message = message;
+    if (task.sourceId === this.watchedSource) this.toast.showTask(task);
   }
   private clear() {
-    this.wrapper?.remove(); this.message?.remove(); this.wrapper = undefined; this.button = undefined;
-    this.label = undefined; this.message = undefined; this.sourceId = undefined; this.busy = false;
+    this.wrapper?.remove(); this.toast.hide(); this.wrapper = undefined; this.button = undefined;
+    this.label = undefined; this.watchedSource = undefined; this.sourceId = undefined; this.busy = false;
   }
   dispose() {
     this.observer?.disconnect(); document.removeEventListener('turbo:load', this.schedule);

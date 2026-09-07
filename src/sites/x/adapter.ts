@@ -1,8 +1,9 @@
+import { CaptureToast } from '../toast';
 import type { CaptureItem } from '../../domain/capture';
 import type { TaskView } from '../../domain/task';
 import { languageFor, translate, type Language } from '../../locales/messages';
 import type { AdapterBridge, SiteAdapter } from '../adapter';
-import { applyMenuAppearance, menuBackground, roteIcon } from './appearance';
+import { applyMenuAppearance, roteIcon } from './appearance';
 import { canonicalPost, extractPost, ownElements } from './extract';
 
 interface Target { article: HTMLElement; trigger: HTMLElement; sourceId?: string; menusBefore: Set<Element> }
@@ -12,14 +13,11 @@ export class XAdapter implements SiteAdapter {
   private target?: Target;
   private menu?: HTMLElement;
   private row?: HTMLElement;
-  private toast?: HTMLElement;
-  private toastText?: HTMLElement;
-  private toastAction?: HTMLButtonElement;
-  private timer?: ReturnType<typeof setTimeout>;
+  private toast: CaptureToast;
   private frame?: number;
   private watchedSource?: string;
   private language: Language = languageFor('system', document.documentElement.lang || navigator.language);
-  constructor(private bridge: AdapterBridge) {}
+  constructor(private bridge: AdapterBridge) { this.toast = new CaptureToast(key => this.t(key), () => this.bridge.openSettings()); }
   private t(key: string) { return translate(this.language, key); }
   mount() {
     document.addEventListener('click', this.onClick, true);
@@ -78,21 +76,22 @@ export class XAdapter implements SiteAdapter {
     const save = (event: Event) => {
       event.preventDefault(); event.stopPropagation();
       if (row.getAttribute('aria-disabled') === 'true') return;
+      this.toast.reset();
       let capture: CaptureItem;
       try {
         capture = extractPost(target.article);
         if (capture.sourceId !== target.sourceId) throw new Error('unsupported');
       } catch (error) {
-        this.showToast(error instanceof Error ? error.message : 'unsupported', template);
+        this.toast.show(error instanceof Error ? error.message : 'unsupported');
         this.closeMenu(target.trigger); return;
       }
       row.setAttribute('aria-disabled','true');
       this.watchedSource = capture.sourceId;
-      this.showToast('saving', template);
+      this.toast.show('saving');
       this.closeMenu(target.trigger);
       void this.bridge.save(capture).then(task => { if (task) this.update(task); }, error => {
         const key = error instanceof Error ? error.message : 'save_failed';
-        this.showToast(key, undefined, key === 'not_configured');
+        this.toast.show(key, true);
       });
     };
     row.addEventListener('click', save);
@@ -151,36 +150,11 @@ export class XAdapter implements SiteAdapter {
     if (task.site !== 'x') return;
     this.updateRow(task);
     if (task.sourceId !== this.watchedSource) return;
-    const key = task.status === 'saved' ? 'saved' : task.status === 'uncertain' ? 'create_uncertain'
-      : task.status === 'failed' ? task.noteId ? 'partial' : task.error ?? 'save_failed' : 'saving';
-    this.showToast(key, undefined, task.status === 'failed' || task.status === 'uncertain');
+    this.toast.showTask(task);
   }
-  private showToast(key: string, template?: HTMLElement, action = false) {
-    if (this.timer) clearTimeout(this.timer);
-    if (!this.toast) {
-      const host = document.createElement('div'); host.dataset.roteToast = '';
-      const shadow = host.attachShadow({ mode: 'closed' });
-      const style = document.createElement('style');
-      style.textContent = ':host{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2147483647;max-width:calc(100vw - 32px)}.message{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;box-shadow:0 2px 12px #0003;font-size:14px;line-height:20px}button{font:inherit;color:inherit;border:0;background:transparent;cursor:pointer;white-space:nowrap;padding:0;text-decoration:underline}button:focus-visible{outline:2px solid currentColor;outline-offset:3px}';
-      const box = document.createElement('div'); box.className = 'message'; box.setAttribute('role','status'); box.setAttribute('aria-live','polite');
-      const basis = template ?? document.body;
-      box.style.background = menuBackground(basis); box.style.color = getComputedStyle(basis).color;
-      box.style.fontFamily = getComputedStyle(basis).fontFamily;
-      this.toastText = document.createElement('span');
-      this.toastAction = document.createElement('button'); this.toastAction.textContent = this.t('settingsLink');
-      this.toastAction.onclick = () => { void this.bridge.openSettings(); this.removeToast(); };
-      const close = document.createElement('button'); close.textContent = '×'; close.setAttribute('aria-label', this.language === 'zh' ? '关闭' : 'Close');
-      close.onclick = () => this.removeToast();
-      box.append(this.toastText, this.toastAction, close); shadow.append(style,box); document.body.append(host); this.toast = host;
-    }
-    this.toastText!.textContent = this.t(key); this.toastAction!.hidden = !action;
-    if (key === 'saved' || ['incomplete','unsupported','empty_capture'].includes(key)) this.timer = setTimeout(() => this.removeToast(), 6000);
-  }
-  private removeToast() { this.toast?.remove(); this.toast = undefined; }
   dispose() {
     this.menu?.removeEventListener('keydown', this.menuKeys, true);
-    this.observer?.disconnect(); this.clearTarget(); this.removeToast();
-    if (this.timer) clearTimeout(this.timer);
+    this.observer?.disconnect(); this.clearTarget(); this.toast.hide();
     if (this.frame !== undefined) cancelAnimationFrame(this.frame);
     document.removeEventListener('click', this.onClick, true);
     document.removeEventListener('keydown', this.onKey, true);

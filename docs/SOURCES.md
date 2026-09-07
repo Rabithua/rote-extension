@@ -16,3 +16,5 @@
 GitHub uses the host's btn / btn-sm and flash classes without global CSS injection. Public visibility and repository identity come from page octolytics metadata; description comes from the About text node. Verified against octocat/Hello-World on 2026-09-07. Independent viewport-height scrolling follows Rote SideContentLayout behavior while retaining the extension's existing column proportions.
 
 0.2.1 correction: use web/src/layout/dashboard/index.tsx as the sidebar reference (sticky sidebar and overflow-visible content). SideContentLayout is the separately scrolling auxiliary panel and is not the requested primary sidebar behavior.
+
+0.2.3: X and GitHub share CaptureToast in Shadow DOM. Its palette uses Rote popover / popover-foreground / border tokens, following web/src/components/ui/sonner.tsx. Bottom-center placement is the user's explicit choice; system color scheme is shared across sites. Native menu/button styling remains site-specific.

@@ -91,3 +91,9 @@ User diagnostics for Rabithua/Rote confirmed valid repository metadata, no pageh
 Two regression fixtures (unclassed Fork link and the reported Unwatch/Star labels) both failed on the 0.2.1 build with no injected button. Both are included in the 0.2.2 browser suite and verify visible entry plus successful save. This reproduces a resolver failure matching the reported controls; the full signed-in DOM and Dia page are not directly verified.
 
 0.2.2 validation: lint, typecheck, all 31 unit tests, all 20 Chromium tests and production build passed.
+
+## 0.2.3 Shared Rote capture toast
+
+X and GitHub now use the same Shadow DOM CaptureToast with Rote popover tokens, system light/dark theme and bottom-center placement. Saving, success and recovery states update one node. Success dismisses after six seconds; failures and uncertain saves retain a settings action. Manual dismissal suppresses later updates until a new capture. GitHub status lookup does not display historical success notifications.
+
+Validation: lint, typecheck, production build, 34 unit tests and all 21 Chromium scenarios passed. New tests compare computed toast styles across sites, verify centered placement, automatic dismissal, no toast on page revisit, failure recovery action and 360px layout. Unit tests cover in-place transitions, persistent failures, timer cancellation, manual dismissal and settings action. Dark toast screenshot inspected; UI verification uses local site fixtures.
