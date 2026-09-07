@@ -147,3 +147,8 @@ Removed extra author/handle/timestamp lines from X, channel names from YouTube, 
 ## 0.4.4 Web Clipper naming
 
 Updated English and Chinese extension names and descriptions to describe multi-site clipping, webpage bookmarks and text selections. Toolbar title uses the localized extension name; README introduction matches. Production build passed and generated manifest/locales were checked, including name/description length limits. Capture behavior is unchanged.
+
+
+## Chrome Web Store replacement preparation
+
+Production lint, typecheck, 49 unit tests and all 37 Chromium scenarios passed. The supplied review OpenKey connected successfully and created private HN/arXiv notes and a Bilibili note with one finalized image; GET verified contents and attachment counts. Screenshots came from real public pages in disposable Chromium. No review credential is included in the repository or packages.

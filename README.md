@@ -2,9 +2,13 @@
 
 一键收藏网页、摘录文字，将社交帖子、视频、开源项目和论文保存到 Rote。支持图片附件、自定义标签和可见性。
 
-支持 X、GitHub、YouTube、B站、Hacker News、arXiv、Bluesky，并通过右键保存普通网页或选中文字。使用 WXT、TypeScript、React、Manifest V3 和 Bun，开发者模式加载。
+支持 X、GitHub、YouTube、B站、Hacker News、arXiv、Bluesky，并通过右键保存普通网页或选中文字。使用 WXT、TypeScript、React、Manifest V3 和 Bun，支持 Chrome 商店安装与开发者模式加载。
+
+源码：[Rabithua/rote-extension](https://github.com/Rabithua/rote-extension) · [问题反馈](https://github.com/Rabithua/rote-extension/issues) · [隐私政策](docs/PRIVACY.md)
 
 ## 安装
+
+[Chrome 应用商店](https://chromewebstore.google.com/detail/cahpbdbfdfnmoachkjmcfgbbnmjcbpej)（新版审核通过后更新）。以下为开发者模式安装步骤：
 
 1. 解压发布 ZIP，保留整个 `chrome-mv3` 文件夹。
 2. 打开 `chrome://extensions`，开启「开发者模式」，点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的 `chrome-mv3` 文件夹。
@@ -59,7 +63,7 @@ bun run zip
 
 OpenKey 只在扩展可信上下文存取，storage.local 设置 `TRUSTED_CONTEXTS`。不会注入网页，也不使用 Rote Cookie。GET OpenKey 参数遵循现有服务端协议，POST 放在 JSON 请求体。发布包不含任何账户配置或测试密钥。
 
-默认主机权限为 X、GitHub、www.youtube.com，以及图片 CDN `pbs.twimg.com` 和 `i.ytimg.com`。可选 HTTPS 匹配范围用于运行时申请用户配置的具体服务/上传域名，不会在安装时获得所有站点权限。localhost HTTP 仅用于本地开发实例。
+默认主机权限覆盖已适配的 X、GitHub、YouTube、B站、Hacker News、arXiv、Bluesky，以及这些站点所需的公开 API 和图片 CDN。可选 HTTPS 匹配范围用于运行时申请用户配置的具体服务/上传域名，不会在安装时获得所有站点权限。localhost HTTP 仅用于本地开发实例。
 
 网络请求均从扩展后台发出。有对应 host permissions 时通常无需修改 Rote 或对象存储 CORS。参见 [Chrome 跨域请求文档](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)。
 

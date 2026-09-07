@@ -506,3 +506,17 @@ test('Bluesky keyboard opening binds the post before the menu appears',async({co
   await context.route('https://bsky.app/**',r=>r.fulfill({contentType:'text/html',body:`<html lang="en"><body><div data-testid="postThreadItem-by-user.test"><a href="/profile/user.test/post/123">Time</a><button data-testid="postDropdownBtn">More</button></div><script>document.querySelector('button').onkeydown=e=>{if(e.key!=='ArrowDown')return;const m=document.createElement('div');m.setAttribute('role','menu');m.innerHTML='<button role=menuitem>Copy post text</button>';document.body.append(m)}</script></body></html>`}));
   const page=await context.newPage();await page.goto('https://bsky.app/profile/user.test/post/123');await page.getByRole('button',{name:'More'}).focus();await page.keyboard.press('ArrowDown');await expect(page.locator('[data-rote-page=bluesky]')).toHaveCount(1);
 });
+
+test('old published text cache does not block new settings or get cleared', async ({context, extensionId}) => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/options.html`);
+  await page.evaluate(() => chrome.storage.local.set({content: ['unsaved old text\n']}));
+  await page.reload();
+  await expect(page.locator('#openKey')).toBeVisible();
+  await page.locator('#apiUrl').fill('http://127.0.0.1:43119');
+  await page.locator('#openKey').fill(testKey);
+  await page.locator('#language').selectOption('en');
+  await page.locator('button[type=submit]').click();
+  await expect(page.getByRole('status').filter({hasText:'Connected'})).toBeVisible();
+  expect(await page.evaluate(async () => (await chrome.storage.local.get('content')).content)).toEqual(['unsaved old text\n']);
+});
