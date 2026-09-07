@@ -242,23 +242,26 @@ test('GitHub excludes private repos and recovers failed creation from settings',
   await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('[data-rote-github] button')).toHaveText('Saved to Rote');
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes[0].content).toBe('Owner/Repo\n\nhttps://github.com/Owner/Repo');
 });
-test('desktop columns scroll independently and narrow windows use document scrolling',async({context,extensionId})=>{
-  const settings=await connect(context,extensionId,'zh');await settings.setViewportSize({width:1100,height:600});
+test('settings use document scrolling and a sticky sidebar without nested scroll areas',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId,'zh');await settings.setViewportSize({width:1100,height:1100});
   await settings.locator('#theme').selectOption('dark');
   await settings.locator('button[type=submit]').click();await expect(settings.locator('html')).toHaveClass('dark');
   await settings.evaluate(()=>{
     const list=document.querySelector('.activity-column .section')!;
     for(let i=0;i<30;i++){const row=document.createElement('article');row.className='task';row.textContent='Recent capture '+i;row.style.height='80px';list.append(row);}
+    window.scrollTo(0,200);
   });
-  const left=await settings.locator('.settings-column').boundingBox();
-  await settings.locator('.activity-column').evaluate(el=>{el.scrollTop=600;});
-  expect(await settings.locator('.activity-column').evaluate(el=>el.scrollTop)).toBe(600);
-  expect(await settings.locator('.settings-column').boundingBox()).toEqual(left);
-  expect(await settings.evaluate(()=>window.scrollY)).toBe(0);
+  await expect.poll(()=>settings.locator('.settings-column').evaluate(el=>Math.round(el.getBoundingClientRect().top))).toBe(24);
+  await settings.evaluate(()=>window.scrollTo(0,600));
+  await expect.poll(()=>settings.evaluate(()=>window.scrollY)).toBe(600);
+  expect(await settings.locator('.settings-column').evaluate(el=>Math.round(el.getBoundingClientRect().top))).toBe(24);
+  for(const column of ['.settings-column','.activity-column']) expect(await settings.locator(column).evaluate(el=>getComputedStyle(el).overflowY)).toBe('visible');
+  await mkdir('test-results/visuals',{recursive:true});await settings.screenshot({path:'test-results/visuals/sticky-settings-dark.png'});
+  await settings.setViewportSize({width:1100,height:600});
   await settings.locator('button[type=submit]').scrollIntoViewIfNeeded();await expect(settings.locator('button[type=submit]')).toBeInViewport();
-  await mkdir('test-results/visuals',{recursive:true});await settings.screenshot({path:'test-results/visuals/columns-dark-zh.png'});
+  expect(await settings.locator('.settings-column').evaluate(el=>el.scrollTop)).toBe(0);
   await settings.setViewportSize({width:360,height:600});
-  expect(await settings.locator('.activity-column').evaluate(el=>getComputedStyle(el).overflowY)).toBe('visible');
+  expect(await settings.locator('.settings-column').evaluate(el=>getComputedStyle(el).position)).toBe('static');
   expect(await settings.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -275,4 +278,26 @@ test('GitHub dark Chinese button supports keyboard and bottom corner clicks at z
   await page.mouse.click(box.x+box.width-4,box.y+box.height-4);await expect(button).toHaveText('已保存到 Rote');
   await page.evaluate(()=>{history.pushState({},'', '/Other/Repo');document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Repo');document.dispatchEvent(new Event('turbo:load'));});
   await expect(button).toHaveText('保存到 Rote');await button.focus();await page.keyboard.press('Enter');await expect(button).toHaveText('已保存到 Rote');
+});
+
+test('GitHub mounts beside modern Star/Fork controls and ignores hidden legacy actions',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  const html=githubFixture().replace('<ul class="pagehead-actions">','<ul class="pagehead-actions" style="display:none">').replace('</body>', '<div class="modern-actions" style="display:flex;gap:8px"><button class="modern-button" data-component="Button">Watch</button><button class="modern-button" data-component="Button">Fork <span>2</span></button><div><button class="modern-button" data-component="Button"><svg width="16" height="16" style="vertical-align:text-bottom" class="octicon-star-fill"></svg>Starred <span>20</span></button></div></div><style>.modern-button{font:500 12px/20px system-ui;padding:3px 12px;border:1px solid #d1d9e0;border-radius:6px;background:#f6f8fa}</style></body>');
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:html}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  const button=page.locator('[data-rote-github] button');await expect(button).toBeVisible();
+  await expect(page.locator('.modern-actions [data-rote-github]')).toHaveCount(1);
+  const native=page.getByRole('button',{name:'Starred 20'});
+  expect((await button.boundingBox())!.height).toBe((await native.boundingBox())!.height);
+  await page.evaluate(()=>{document.querySelector('.modern-actions')!.replaceWith(document.querySelector('.modern-actions')!.cloneNode(true));});
+  await expect(button).toHaveCount(1);await expect(button).toBeVisible();
+  await button.click();await expect(button).toHaveText('Saved to Rote');
+});
+test('GitHub mounts after public metadata arrives without a navigation event',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubFixture('Owner/Repo',false)}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  await expect(page.locator('[data-rote-github]')).toHaveCount(0);
+  await page.evaluate(()=>document.querySelector('meta[name$="_public"]')!.setAttribute('content','true'));
+  await expect(page.locator('[data-rote-github] button')).toBeVisible();
 });

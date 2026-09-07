@@ -166,10 +166,7 @@ a:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
 @media(max-width:400px) { .page { padding:20px 16px; } .preferences { gap:12px; } }
 
 @media(min-width:801px) {
-  .page { height:100dvh; box-sizing:border-box; display:flex; flex-direction:column; padding-bottom:24px; overflow:hidden; }
-  .brand { flex-shrink:0; }
-  .options-layout { min-height:0; flex:1; }
-  .settings-column, .activity-column { overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
-  .settings-column { padding-right:8px; }
-  #activity-heading { position:sticky; top:0; z-index:1; background:var(--background); padding-bottom:12px; margin-bottom:0; }
+  .options-layout { align-items:start; }
+  .settings-column { position:sticky; top:min(24px, calc(100dvh - var(--settings-height, 0px) - 24px)); }
+  #activity-heading { position:sticky; top:0; z-index:1; background:var(--background); padding:12px 0; margin-bottom:0; }
 }

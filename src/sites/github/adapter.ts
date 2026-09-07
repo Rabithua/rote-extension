@@ -2,6 +2,7 @@ import type { TaskView } from '../../domain/task';
 import { languageFor, translate } from '../../locales/messages';
 import type { AdapterBridge, SiteAdapter } from '../adapter';
 import { roteIcon } from '../x/appearance';
+import { repositoryActions } from './actions';
 import { extractRepository } from './extract';
 
 export class GitHubAdapter implements SiteAdapter {
@@ -18,7 +19,7 @@ export class GitHubAdapter implements SiteAdapter {
   private t(key: string) { return translate(languageFor('system', document.documentElement.lang), key); }
   mount() {
     this.observer = new MutationObserver(this.schedule);
-    this.observer.observe(document.documentElement, { childList: true, subtree: true });
+    this.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['content', 'hidden', 'class'] });
     document.addEventListener('turbo:load', this.schedule);
     window.addEventListener('popstate', this.schedule);
     this.refresh();
@@ -29,17 +30,22 @@ export class GitHubAdapter implements SiteAdapter {
   };
   private refresh() {
     const capture = extractRepository();
-    const actions = document.querySelector<HTMLElement>('.pagehead-actions');
+    const resolved = capture ? repositoryActions(capture.repository) : null;
+    const actions = resolved?.container;
     if (!capture || !actions) { this.clear(); return; }
     if (this.sourceId === capture.sourceId && this.wrapper?.parentElement === actions) return;
     this.clear();
-    const template = actions.querySelector<HTMLElement>('.btn');
+    const template = resolved?.template;
     if (!template) return;
     actions.querySelectorAll('[data-rote-github]').forEach(element => element.remove());
-    const wrapper = document.createElement('li'); wrapper.dataset.roteGithub = '';
+    const wrapper = document.createElement(actions.matches('ul,ol') ? 'li' : 'div'); wrapper.dataset.roteGithub = '';
     const button = document.createElement('button'); button.type = 'button';
     // GitHub owns these scoped button classes, including theme, hover and focus states.
-    button.className = 'btn btn-sm';
+    button.className = template.className;
+    if (template.dataset.component) button.dataset.component = template.dataset.component;
+    if (template.dataset.size) button.dataset.size = template.dataset.size;
+    if (template.dataset.variant) button.dataset.variant = template.dataset.variant;
+    button.style.whiteSpace = 'nowrap';
     const icon = roteIcon(); icon.setAttribute('width','16'); icon.setAttribute('height','16');
     icon.style.cssText = 'width:16px;height:16px;vertical-align:text-bottom;margin-right:4px;fill:currentColor';
     const label = document.createElement('span'); label.textContent = this.t('save');
