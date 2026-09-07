@@ -10,6 +10,7 @@ export interface PageDefinition {
   site: PageCapture['site'];
   sourceId(url: string): string | null;
   closeMenu?(): void;
+  isMountedValid?(): boolean;
   extract(): PageCapture | null | Promise<PageCapture | null>;
   mountButton(label: string): { button: HTMLButtonElement; root: HTMLElement } | null;
 }
@@ -37,7 +38,8 @@ export class PageAdapter implements SiteAdapter {
 
   mount() {
     this.observer = new MutationObserver(this.schedule);
-    this.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
+    this.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'aria-labelledby', 'data-state'] });
+    document.addEventListener('rote:page-refresh', this.schedule);
     this.refresh();
   }
 
@@ -49,7 +51,7 @@ export class PageAdapter implements SiteAdapter {
   private refresh() {
     const sourceId = this.definition.sourceId(location.href);
     if (!sourceId) { this.clear(); return; }
-    if (sourceId === this.routeId && this.root?.isConnected) return;
+    if (sourceId === this.routeId && this.root?.isConnected && (this.definition.isMountedValid?.() ?? true)) return;
     if (sourceId !== this.routeId) { this.clear(); this.routeId = sourceId; this.sourceId = sourceId; }
     this.root?.remove(); this.root = undefined; this.button = undefined; this.label = undefined;
     const mounted = this.definition.mountButton(this.t('save'));
@@ -113,6 +115,7 @@ export class PageAdapter implements SiteAdapter {
 
   dispose() {
     this.observer?.disconnect();
+    document.removeEventListener('rote:page-refresh', this.schedule);
     if (this.frame !== undefined) cancelAnimationFrame(this.frame);
     this.frame = undefined; this.clear();
   }

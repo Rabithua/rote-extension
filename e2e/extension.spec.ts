@@ -489,3 +489,20 @@ test('Bluesky nested menu preserves native typography and contains the entire ro
   await page.getByRole('menuitem').first().focus();
   await page.keyboard.press('End');await expect(row).toBeFocused();await row.click({position:{x:3,y:3}});await expect(page.getByRole('menu')).toHaveCount(0);
 });
+test('Bluesky menu mounts when native menu opens on pointerdown before click',async({context,extensionId})=>{
+  await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://bsky.app/**',r=>r.fulfill({contentType:'text/html',body:`<html lang="en"><body><div data-testid="postThreadItem-by-user.test"><a href="/profile/user.test/post/123">Time</a><button data-testid="postDropdownBtn">More</button></div><script>document.querySelector('button').onpointerdown=()=>{const m=document.createElement('div');m.setAttribute('role','menu');m.innerHTML='<button role=menuitem>Copy post text</button>';document.body.append(m)}</script></body></html>`}));
+  const page=await context.newPage();await page.goto('https://bsky.app/profile/user.test/post/123');const more=page.getByRole('button',{name:'More'});await more.hover();await page.mouse.down();await page.waitForTimeout(250);await page.mouse.up();await expect(page.locator('[data-rote-page=bluesky]')).toHaveCount(1);
+});
+test('Bluesky binds pre-opened menus through their native owner and excludes reply menus',async({context,extensionId})=>{
+  await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://bsky.app/**',r=>r.fulfill({contentType:'text/html',body:`<html lang="en"><body><div data-testid="postThreadItem-by-user.test"><a href="/profile/user.test/post/123/liked-by">Likes</a><button id="main-more" data-testid="postDropdownBtn">More</button></div><div data-testid="postThreadItem-by-other.test"><a href="/profile/other.test/post/456">Time</a><button id="reply-more" data-testid="postDropdownBtn">Reply More</button></div><div role="menu" aria-labelledby="main-more"><button role="menuitem">Copy text</button></div></body></html>`}));
+  const page=await context.newPage();await page.goto('https://bsky.app/profile/user.test/post/123');const row=page.locator('[data-rote-page=bluesky]');await expect(row).toHaveCount(1);
+  await page.getByRole('menu').evaluate(e=>e.setAttribute('aria-labelledby','reply-more'));await expect(row).toHaveCount(0);
+  await page.getByRole('menu').evaluate(e=>e.setAttribute('aria-labelledby','main-more'));await expect(row).toHaveCount(1);
+});
+test('Bluesky keyboard opening binds the post before the menu appears',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  await context.route('https://bsky.app/**',r=>r.fulfill({contentType:'text/html',body:`<html lang="en"><body><div data-testid="postThreadItem-by-user.test"><a href="/profile/user.test/post/123">Time</a><button data-testid="postDropdownBtn">More</button></div><script>document.querySelector('button').onkeydown=e=>{if(e.key!=='ArrowDown')return;const m=document.createElement('div');m.setAttribute('role','menu');m.innerHTML='<button role=menuitem>Copy post text</button>';document.body.append(m)}</script></body></html>`}));
+  const page=await context.newPage();await page.goto('https://bsky.app/profile/user.test/post/123');await page.getByRole('button',{name:'More'}).focus();await page.keyboard.press('ArrowDown');await expect(page.locator('[data-rote-page=bluesky]')).toHaveCount(1);
+});

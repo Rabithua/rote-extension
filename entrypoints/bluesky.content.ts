@@ -4,5 +4,8 @@ import { blueskyDefinition, bindBlueskyMenu } from '../src/sites/page/definition
 
 export default defineContentScript({
   matches: ['https://bsky.app/*'], runAt: 'document_idle',
-  main: ctx => { ctx.addEventListener(document, 'click', bindBlueskyMenu, { capture: true }); installPageAdapter(ctx, blueskyDefinition); },
+  main: ctx => {
+    for (const event of ['pointerdown', 'keydown', 'click']) ctx.addEventListener(document, event, bindBlueskyMenu, { capture: true });
+    installPageAdapter(ctx, blueskyDefinition);
+  },
 });

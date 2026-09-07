@@ -65,15 +65,32 @@ export const arxivDefinition: PageDefinition = {
 };
 
 let menuSource: string | null = null;
-// Bind a native More click to the detail post, never a neighboring reply.
-export function bindBlueskyMenu(event: MouseEvent) {
+function isDetailTrigger(trigger: Element): boolean {
+  const post = trigger.closest('[data-testid^="postThreadItem-by-"]');
+  const id = blueskyPostId(location.href);
+  return !!(id && post && Array.from(post.querySelectorAll<HTMLAnchorElement>('a[href]')).some(a => {
+    const url = new URL(a.href); url.pathname = url.pathname.replace(/\/(?:liked-by|reposted-by|quotes)$/, '');
+    return blueskyPostId(url.href) === id;
+  }));
+}
+function currentBlueskyMenu(): HTMLElement | undefined {
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="menu"]')).find(menu => {
+    if (!menu.getBoundingClientRect().height) return false;
+    const labelledBy = menu.getAttribute('aria-labelledby');
+    const trigger = labelledBy ? document.getElementById(labelledBy) : null;
+    // Native Radix ownership takes precedence over event history, including after reload.
+    if (trigger) return trigger.matches('[data-testid="postDropdownBtn"]') && isDetailTrigger(trigger);
+    return menuSource === blueskyPostId(location.href);
+  });
+}
+// Radix opens on pointerdown or keydown; click may arrive after its only DOM mutation.
+export function bindBlueskyMenu(event: Event) {
+  if (event instanceof KeyboardEvent && !['Enter', ' ', 'ArrowDown'].includes(event.key)) return;
   const target = event.target instanceof Element ? event.target : null;
   const trigger = target?.closest('[data-testid="postDropdownBtn"]');
   if (!trigger) return;
-  const post = trigger.closest('[data-testid^="postThreadItem-by-"]');
-  const id = blueskyPostId(location.href);
-  const match = id && post && Array.from(post.querySelectorAll<HTMLAnchorElement>('a[href]')).some(a => blueskyPostId(a.href) === id);
-  menuSource = match ? id : null;
+  menuSource = isDetailTrigger(trigger) ? blueskyPostId(location.href) : null;
+  document.dispatchEvent(new Event('rote:page-refresh'));
 }
 export const blueskyDefinition: PageDefinition = {
   site: 'bluesky', sourceId: blueskyPostId,
@@ -82,9 +99,9 @@ export const blueskyDefinition: PageDefinition = {
     document.querySelector<HTMLElement>('[role="menu"] [role="menuitem"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true }));
     menuSource = null;
   },
+  isMountedValid: () => !!currentBlueskyMenu(),
   mountButton(label) {
-    if (menuSource !== blueskyPostId(location.href)) return null;
-    const menu = Array.from(document.querySelectorAll<HTMLElement>('[role="menu"]')).find(m => m.getBoundingClientRect().height > 0);
+    const menu = currentBlueskyMenu();
     const native = menu?.querySelector<HTMLElement>('[role="menuitem"]');
     if (!menu || !native) return null;
     const element = button(label); element.dataset.rotePage = 'bluesky'; element.setAttribute('role', 'menuitem');
