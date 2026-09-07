@@ -134,3 +134,7 @@ A regression fixture reproduced the missing entry on 0.4.0: the native menu open
 Validation: lint, typecheck, production build, all 48 unit tests and nine targeted browser scenarios pass. The three new scenarios cover delayed mouse release, keyboard opening, pre-opened menus and main-post/reply ownership changes. Existing page adapters, image recovery and Bluesky typography remain covered. Dia inspection could not be completed because native UI actions returned actionUnsupported and noWindowsAvailable; the precise state of the user's loaded extension was not established. This fixes a reproduced code defect matching the reported symptom, without claiming direct verification in Dia.
 
 Live confirmation: on the public cee.wtf post in disposable Chromium, holding the pointer down for 500 ms before releasing still produced exactly one Rote item inside the native menu below Copy post text. The screenshot was inspected; no new note was created for this check.
+
+## 0.4.2 Simplify Bluesky note body
+
+Following the selected metadata in the user's screenshot, new Bluesky notes contain only post text and source URL, with static images still attached. Author display name, handle and timestamp are omitted from the note body; capture metadata remains available for the recent-task title. Existing Rote notes are not edited. Validation: lint, typecheck, production build, 48 unit tests and the targeted Bluesky multi-image browser save scenario passed, with an exact assertion for the simplified body.

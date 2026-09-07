@@ -51,7 +51,7 @@ it('gets full Bluesky record and all static images with stable DID identity',asy
   const data={thread:{post:{uri:'at://did:plc:abc/app.bsky.feed.post/123',author:{did:'did:plc:abc',handle:'user.test',displayName:'User'},record:{$type:'app.bsky.feed.post',text:'Full\ntext',createdAt:'2026-09-07T00:00:00.000Z'},embed:{$type:'app.bsky.embed.images#view',images:[1,2].map(n=>({fullsize:`https://cdn.bsky.app/img/feed_fullsize/plain/${n}.jpg`,alt:`${n}`}))}}}};
   vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(data))));
   const item=await remoteCapture({site:'bluesky',url:'https://bsky.app/profile/user.test/post/123'});
-  expect(item.sourceId).toBe('did:plc:abc/post/123');expect(item.text).toBe('Full\ntext');expect(item.images).toHaveLength(2);expect(noteContent(item)).toContain('2026-09-07T00:00:00.000Z');
+  expect(item.sourceId).toBe('did:plc:abc/post/123');expect(item.text).toBe('Full\ntext');expect(item.images).toHaveLength(2);expect(noteContent(item)).toBe('Full\ntext\n\nhttps://bsky.app/profile/did:plc:abc/post/123');
 });
 it('preserves exact selections and deduplicates per URL, kind and selection',async()=>{
   const url='https://example.com/a?q=1#section';const text='First\n\n  Second  ';

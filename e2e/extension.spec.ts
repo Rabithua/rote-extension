@@ -433,7 +433,7 @@ test('Bluesky menu closes and full post plus all images are saved',async({contex
   const page=await context.newPage();await page.goto('https://bsky.app/profile/user.test/post/123');await page.getByRole('button',{name:'More'}).click();const button=page.locator('[data-rote-page=bluesky]');await expect(button).toHaveCount(1);await button.click({position:{x:2,y:2}});
   await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
   await expect(page.locator('[data-rote-toast]')).toBeVisible();await page.getByRole('button',{name:'More'}).click();await expect(button).toBeDisabled();
-  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(2);expect(state.data.notes[0].content).toContain('Full post\nSecond paragraph');
+  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(2);expect(state.data.notes[0].content).toBe('Full post\nSecond paragraph\n\nhttps://bsky.app/profile/did:plc:fixture/post/123');
 });
 
 async function invokeContextCapture(context:BrowserContext,url:string,selection?:string) {

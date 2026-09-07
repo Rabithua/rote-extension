@@ -99,6 +99,7 @@ export const captureSchema = z.discriminatedUnion('site', [
 ]);
 export type CaptureItem = z.infer<typeof captureSchema>;
 export function noteContent(item: CaptureItem): string {
+  if (item.site === 'bluesky') return [item.text, item.sourceUrl].filter(Boolean).join('\n\n');
   if (item.site === 'web') return item.kind === 'selection' ? [item.title, item.text, item.sourceUrl].join('\n\n') : [item.title, item.sourceUrl].join('\n\n');
   if (item.site === 'youtube') return [item.title, item.channel, item.sourceUrl].join('\n\n');
   if (item.site === 'github') return [item.repository, item.text.trim(), item.sourceUrl].filter(Boolean).join('\n\n');
