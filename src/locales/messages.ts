@@ -1,0 +1,68 @@
+export const en = {
+  app: 'Rote', tagline: 'Keep what matters.', settings: 'Connection', activity: 'Recent captures',
+  connectionHint: 'Connect once. Save directly from the share menu on X.', apiUrl: 'Rote service address',
+  openKey: 'OpenKey', keyHint: 'Requires SENDROTE, UPLOADATTACHMENT and GETROTE. Stored only in this browser.',
+  connect: 'Connect Rote', connecting: 'Connecting…', connected: 'Connected', saveSettings: 'Save settings',
+  language: 'Language', theme: 'Appearance', system: 'System', light: 'Light', dark: 'Dark',
+  save: 'Save to Rote', saving: 'Saving to Rote…', saved: 'Saved to Rote', failed: 'Save failed',
+  partial: 'Text saved. Images need attention.', uncertain: 'Check save result', queued: 'Waiting to save',
+  retry: 'Retry', reconcile: 'Check in Rote', openSource: 'Open original post', settingsLink: 'Open settings',
+  emptyTitle: 'A place for what catches your eye', emptyBody: 'On X, open a post’s share menu and choose “Save to Rote”.',
+  private: 'Captures are saved as private notes.', images: 'images', uploaded: 'uploaded', grant: 'Allow upload host & retry',
+  allTasks: 'View all captures', ready: 'Ready to capture', noteSaved: 'Note created',
+  not_configured: 'Connect Rote in extension settings first.',
+  incomplete: 'Expand the full post before saving.', empty_capture: 'This post has no supported text or static images.',
+  unsupported: 'Could not read this post. Open its detail page and try again.',
+  missing_permissions: 'This OpenKey needs SENDROTE, UPLOADATTACHMENT and GETROTE.',
+  host_permission: 'Allow access to this server to continue.', invalid_address: 'Use an HTTPS service address (HTTP is allowed for localhost).',
+  invalid_input: 'Check the service address and OpenKey.', not_allowed: 'This request is not allowed.',
+  save_failed: 'Could not complete the save. Your task is kept for recovery.',
+  image_download: 'Could not download an image. Retry when connected.', image_upload: 'Image upload failed. Retry to continue this note.',
+  image_type: 'This image format is not supported.', image_size: 'An image exceeds Rote’s 20 MB limit.',
+  invalid_upload: 'The server returned an unsupported upload address.', manifest_mismatch: 'The server returned an incomplete upload result.',
+  upload_expired: 'Upload credentials expired. This server cannot refresh them.',
+  create_uncertain: 'The server may have saved this note. Check the result before retrying; another note will not be created automatically.',
+  api_0: 'Could not reach Rote. Check the connection.', api_400: 'Rote rejected this request.',
+  api_401: 'OpenKey is invalid or expired.', api_403: 'This key or account cannot perform this action.', api_404: 'This Rote API or note was not found.',
+  api_413: 'The capture exceeds the server’s size limit.', api_429: 'Rote is busy. Try again later.', api_500: 'Rote encountered a server error.',
+  permissionsDenied: 'Permission was not granted.', checked: 'Check completed. Unresolved captures remain here for review.',
+  permissionHint: 'The upload host below was returned by your configured Rote server.',
+} as const;
+export type MessageKey = keyof typeof en;
+export const zh: Record<MessageKey, string> = {
+  app: 'Rote', tagline: '留住值得记下的内容。', settings: '连接设置', activity: '最近采集',
+  connectionHint: '连接一次，即可从 X 的分享菜单直接保存。', apiUrl: 'Rote 服务地址',
+  openKey: 'OpenKey', keyHint: '需要 SENDROTE、UPLOADATTACHMENT 和 GETROTE 权限，仅保存在当前浏览器。',
+  connect: '连接 Rote', connecting: '正在连接…', connected: '已连接', saveSettings: '保存设置',
+  language: '语言', theme: '外观', system: '跟随系统', light: '浅色', dark: '深色',
+  save: '保存到 Rote', saving: '正在保存到 Rote…', saved: '已保存到 Rote', failed: '保存失败',
+  partial: '文字已保存，图片待补传', uncertain: '保存结果待核对', queued: '等待保存',
+  retry: '重试', reconcile: '核对 Rote 中的结果', openSource: '打开原帖', settingsLink: '打开设置',
+  emptyTitle: '记下浏览时的灵光一现', emptyBody: '在 X 打开帖子的分享菜单，选择「保存到 Rote」。',
+  private: '采集内容将保存为私密笔记。', images: '张图片', uploaded: '已上传', grant: '允许上传域名并重试',
+  allTasks: '查看全部采集', ready: '可以开始采集', noteSaved: '笔记已创建',
+  not_configured: '请先在扩展设置中连接 Rote。', incomplete: '请先展开帖子全文，再保存到 Rote。',
+  empty_capture: '这条帖子没有可采集的文字或静态图片。', unsupported: '无法读取这条帖子，请打开详情页后重试。',
+  missing_permissions: '此 OpenKey 需要 SENDROTE、UPLOADATTACHMENT 和 GETROTE 权限。',
+  host_permission: '需要允许访问此服务器才能继续。', invalid_address: '请使用 HTTPS 服务地址，本地 localhost 可使用 HTTP。',
+  invalid_input: '请检查服务地址和 OpenKey。', not_allowed: '无法执行此请求。',
+  save_failed: '暂时无法完成保存，任务已保留，可稍后恢复。',
+  image_download: '图片下载失败，请联网后重试。', image_upload: '图片上传失败，重试会继续补传到同一条笔记。',
+  image_type: '暂不支持此图片格式。', image_size: '图片超过 Rote 的 20 MB 限制。',
+  invalid_upload: '服务器返回了不支持的上传地址。', manifest_mismatch: '服务器返回的图片上传结果不完整。',
+  upload_expired: '上传凭据已过期，此服务器无法刷新凭据。',
+  create_uncertain: '服务器可能已保存笔记，请先核对结果；扩展不会自动重复创建。',
+  api_0: '无法连接 Rote，请检查网络。', api_400: 'Rote 拒绝了此请求。', api_401: 'OpenKey 无效或已过期。',
+  api_403: '此密钥或账号无权执行该操作。', api_404: '未找到对应的 Rote 接口或笔记。',
+  api_413: '内容超过服务器大小限制。', api_429: '请求过于频繁，请稍后重试。', api_500: 'Rote 服务器暂时出现错误。',
+  permissionsDenied: '尚未获得所需访问权限。', checked: '核对完成，仍未确定结果的任务会保留在列表中。',
+  permissionHint: '以下上传域名由你配置的 Rote 服务器返回。',
+};
+export type Language = 'zh' | 'en';
+export function languageFor(value = 'system', fallback = navigator.language): Language {
+  return (value === 'system' ? fallback : value).startsWith('zh') ? 'zh' : 'en';
+}
+export function translate(language: Language, key: string): string {
+  const dictionary = language === 'zh' ? zh : en;
+  return dictionary[key as MessageKey] ?? dictionary.save_failed;
+}

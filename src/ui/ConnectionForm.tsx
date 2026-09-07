@@ -1,0 +1,43 @@
+import { useState, type FormEvent } from 'react';
+import { Check } from 'lucide-react';
+import { Button } from './button';
+import { Input } from './input';
+import { normalizeApiUrl, originPattern, type Settings, type SettingsInput } from '../settings/store';
+import { send } from '../messaging/protocol';
+
+export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | null; onSaved: (settings: Settings) => void; t: (key: string) => string }) {
+  const [apiUrl, setApiUrl] = useState(settings?.apiUrl ?? 'https://rote.ink');
+  const [openKey, setOpenKey] = useState(settings?.openKey ?? '');
+  const [language, setLanguage] = useState<SettingsInput['language']>(settings?.language ?? 'system');
+  const [theme, setTheme] = useState<SettingsInput['theme']>(settings?.theme ?? 'system');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setError(''); setSaved(false);
+    let normalized: string;
+    try { normalized = normalizeApiUrl(apiUrl); } catch { setError('invalid_address'); return; }
+    setBusy(true);
+    try {
+      // Permission request starts directly in the user's click gesture, before any network await.
+      if (!await chrome.permissions.request({ origins: [originPattern(normalized)] })) throw new Error('permissionsDenied');
+      const result = await send({ type: 'settings:save', settings: { apiUrl: normalized, openKey, language, theme } });
+      if (result.settings) { onSaved(result.settings); setSaved(true); }
+    } catch (error) { setError(error instanceof Error ? error.message : 'save_failed'); }
+    finally { setBusy(false); }
+  }
+  return <section className="section" aria-labelledby="connection-heading">
+    <h2 id="connection-heading">{t('settings')}</h2>
+    <p className="subtitle mb-6">{t('connectionHint')}</p>
+    <form onSubmit={submit}>
+      <div className="field"><label htmlFor="apiUrl">{t('apiUrl')}</label><Input id="apiUrl" type="url" value={apiUrl} onChange={e => setApiUrl(e.target.value)} required autoComplete="url" /></div>
+      <div className="field"><label htmlFor="openKey">{t('openKey')}</label><Input id="openKey" type="password" value={openKey} onChange={e => setOpenKey(e.target.value)} required autoComplete="off" spellCheck={false} aria-describedby="key-hint" /><p className="hint" id="key-hint">{t('keyHint')}</p></div>
+      <div className="preferences">
+        <div className="field"><label htmlFor="language">{t('language')}</label><select id="language" value={language} onChange={e => setLanguage(e.target.value as SettingsInput['language'])}><option value="system">{t('system')}</option><option value="zh">简体中文</option><option value="en">English</option></select></div>
+        <div className="field"><label htmlFor="theme">{t('theme')}</label><select id="theme" value={theme} onChange={e => setTheme(e.target.value as SettingsInput['theme'])}><option value="system">{t('system')}</option><option value="light">{t('light')}</option><option value="dark">{t('dark')}</option></select></div>
+      </div>
+      <div className="actions">{saved || settings ? <span className="status" role="status"><Check size={14} />{t('connected')}</span> : null}<Button type="submit" disabled={busy}>{t(busy ? 'connecting' : settings ? 'saveSettings' : 'connect')}</Button></div>
+      {error ? <p className="feedback error" role="alert">{t(error)}</p> : null}
+    </form>
+  </section>;
+}
