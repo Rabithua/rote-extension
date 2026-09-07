@@ -83,3 +83,11 @@ Corrected the reference to Rote's dashboard layout: sticky left column and overf
 GitHub action discovery no longer requires both pagehead-actions and btn. It ignores hidden legacy containers, locates visible Star/Fork groups, preserves the native button classes and component attributes, supports list and div containers, and observes delayed public metadata. These are confirmed gaps in the previous implementation; the user's specific missing-button cause is not confirmed because computer-use access to their current GitHub URL was denied. No alternate browser-control path was used for that URL.
 
 Validation: 31 unit tests, lint, typecheck and production build pass. All 18 Chromium scenarios pass across regression and targeted reruns. Added fixtures cover modern Star/Fork markup, hidden duplicate action lists, cloned/rebuilt controls, and delayed public metadata. Sidebar checks assert document scrolling, visible overflow in both columns, stable sticky position, short-window submit access and narrow layout. The dark sidebar screenshot was inspected. The current signed-in GitHub page remains unverified.
+
+## 0.2.2 GitHub Fork links and Unwatch/Star groups
+
+User diagnostics for Rabithua/Rote confirmed valid repository metadata, no pagehead-actions element, and Unwatch / Star controls but no Fork button. The previous resolver required a Fork peer and excluded links without the btn class. Added href-based repository Fork link recognition and support for Watch/Unwatch peers alongside Star.
+
+Two regression fixtures (unclassed Fork link and the reported Unwatch/Star labels) both failed on the 0.2.1 build with no injected button. Both are included in the 0.2.2 browser suite and verify visible entry plus successful save. This reproduces a resolver failure matching the reported controls; the full signed-in DOM and Dia page are not directly verified.
+
+0.2.2 validation: lint, typecheck, all 31 unit tests, all 20 Chromium tests and production build passed.

@@ -301,3 +301,24 @@ test('GitHub mounts after public metadata arrives without a navigation event',as
   await page.evaluate(()=>document.querySelector('meta[name$="_public"]')!.setAttribute('content','true'));
   await expect(page.locator('[data-rote-github] button')).toBeVisible();
 });
+
+test('GitHub finds an unclassed Fork link beside Star without the legacy action list',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  const html=githubFixture().replace(/<ul class="pagehead-actions">.*?<\/ul>/, '<div class="repo-toolbar" style="display:flex;gap:8px"><a href="/Owner/Repo/fork" class="new-link">Fork 69</a><div><button class="btn" aria-label="Star Owner/Repo">Star 1k</button></div></div>');
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:html}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  await expect(page.locator('.pagehead-actions')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Fork/})).toHaveCount(0);
+  const button=page.locator('.repo-toolbar [data-rote-github] button');await expect(button).toBeVisible();
+  await button.click();await expect(button).toHaveText('Saved to Rote');
+  expect(page.url()).toBe('https://github.com/Owner/Repo');
+});
+test('GitHub can locate the action group from the reported Unwatch and Star buttons',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  const html=githubFixture().replace(/<ul class="pagehead-actions">.*?<\/ul>/, '<div class="repo-toolbar" style="display:flex;gap:8px"><div><button class="btn" aria-label="Unwatch: All Activity in Owner/Repo. 3 users are watching this repository. Click to change subscription settings.">Unwatch 3</button></div><div><button class="btn" aria-label="Star Owner/Repo">Star 1k</button></div></div>');
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:html}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  const button=page.locator('.repo-toolbar [data-rote-github] button');await expect(button).toBeVisible();
+  await expect(page.locator('[data-rote-github]')).toHaveCount(1);
+  await button.click();await expect(button).toHaveText('Saved to Rote');
+});
