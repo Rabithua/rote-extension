@@ -26,13 +26,13 @@ it('keeps HN original link and main text, excludes metrics and comments', () => 
   // HTML parser does not retain a standalone tr outside a table.
   document.body.innerHTML = '<div class="athing"><div class="titleline"><a href="https://example.com/article">Title</a></div></div>' + document.body.innerHTML;
   const content = noteContent(extractHackerNews(document,'https://news.ycombinator.com/item?id=123')!);
-  expect(content).toContain('https://example.com/article'); expect(content).toContain('Opening\n\nNext paragraph'); expect(content).not.toContain('100 points'); expect(content).not.toContain('Do not capture');
+  expect(content).toContain('https://example.com/article'); expect(content).toContain('Opening\n\nNext paragraph'); expect(content).not.toContain('Author'); expect(content).not.toContain('100 points'); expect(content).not.toContain('Do not capture');
 });
 it('extracts arXiv abstract and version without downloading PDF',()=>{
   document.head.innerHTML='<meta name="citation_title" content="Paper"><meta name="citation_author" content="Author">';
   document.body.innerHTML='<blockquote class="abstract">Abstract: Full summary</blockquote>';
   const item=extractArxiv(document,'https://arxiv.org/abs/2401.12345v2')!;
-  expect(noteContent(item)).toBe('Paper\n\nAuthor\n\nFull summary\n\nhttps://arxiv.org/abs/2401.12345v2'); expect(item.images).toEqual([]);
+  expect(noteContent(item)).toBe('Paper\n\nFull summary\n\nhttps://arxiv.org/abs/2401.12345v2'); expect(item.images).toEqual([]);
 });
 it('enforces CDN boundaries shared with the downloader',()=>{
   expect(imageUrlAllowed('https://i0.hdslb.com/bfs/archive/a.jpg','bilibili')).toBe(true);
@@ -43,7 +43,7 @@ it('enforces CDN boundaries shared with the downloader',()=>{
 it('normalizes Bilibili AV to BV and rejects stale DOM fallback',async()=>{
   vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:0,data:{bvid:'BV1234567890',aid:123,title:'Video',pic:'http://i0.hdslb.com/bfs/archive/a.jpg',owner:{name:'Creator'}}}))));
   const item=await remoteCapture({site:'bilibili',url:'https://www.bilibili.com/video/av123'});
-  expect(item.sourceId).toBe('BV1234567890'); expect(item.text).toBe(''); expect(item.images).toHaveLength(1);
+  expect(noteContent(item)).toBe('Video\n\nhttps://www.bilibili.com/video/BV1234567890'); expect(item.sourceId).toBe('BV1234567890'); expect(item.text).toBe(''); expect(item.images).toHaveLength(1);
   document.head.innerHTML='<link rel="canonical" href="https://www.bilibili.com/video/BV9999999999">';
   expect(await extractBilibili(document,'https://www.bilibili.com/video/BV1234567890')).toBeNull();
 });
@@ -76,4 +76,12 @@ it('does not authorize generic capture messages or mismatched remote extraction'
 it('refuses arXiv missing its abstract rather than marking it complete',()=>{
   document.head.innerHTML='<meta name="citation_title" content="Paper"><meta name="citation_author" content="Author">'; document.body.innerHTML='';
   expect(extractArxiv(document,'https://arxiv.org/abs/2401.12345')).toBeNull();
+});
+it('omits X attribution metadata while preserving names and dates inside the original text',async()=>{
+  const { capture } = await import('./fixtures');
+  const item = capture('123');
+  if (item.site !== 'x') throw new Error('Expected X fixture');
+  item.text = 'Test Author @test said this on 2026-09-07.\nKeep original wording.';
+  item.quotedUrl = 'https://x.com/other/status/456';
+  expect(noteContent(item)).toBe(item.text+'\n\n'+item.sourceUrl+'\n\n'+item.quotedUrl);
 });

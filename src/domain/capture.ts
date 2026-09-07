@@ -101,9 +101,9 @@ export type CaptureItem = z.infer<typeof captureSchema>;
 export function noteContent(item: CaptureItem): string {
   if (item.site === 'bluesky') return [item.text, item.sourceUrl].filter(Boolean).join('\n\n');
   if (item.site === 'web') return item.kind === 'selection' ? [item.title, item.text, item.sourceUrl].join('\n\n') : [item.title, item.sourceUrl].join('\n\n');
-  if (item.site === 'youtube') return [item.title, item.channel, item.sourceUrl].join('\n\n');
+  if (item.site === 'youtube') return [item.title, item.sourceUrl].join('\n\n');
   if (item.site === 'github') return [item.repository, item.text.trim(), item.sourceUrl].filter(Boolean).join('\n\n');
-  if (item.site !== 'x') return [item.title, item.byline, item.text, item.sourceUrl].filter(Boolean).join('\n\n');
-  return [item.text.trim(), `${item.author.name} (${item.author.handle})`, item.publishedAt, item.sourceUrl,
+  if (item.site !== 'x') return [item.title, item.text, item.sourceUrl].filter(Boolean).join('\n\n');
+  return [item.text.trim(), item.sourceUrl,
     item.quotedUrl].filter(Boolean).join('\n\n');
 }

@@ -6,7 +6,7 @@ import { captureTags } from '../src/domain/tags';
 import { isSiteRequestAllowed } from '../src/messaging/background';
 it('captures complete title and plain channel metadata with one bound cover',()=>{
   document.body.innerHTML=youtubeCard();const item=extractCard(document.querySelector('yt-lockup-view-model')!)!;
-  expect(noteContent(item)).toBe('Full video title\n\nTest Channel\n\nhttps://www.youtube.com/watch?v=abcdefghijk');
+  expect(noteContent(item)).toBe('Full video title\n\nhttps://www.youtube.com/watch?v=abcdefghijk');
   expect(item.images).toEqual([{url:'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',alt:'Full video title'}]);
   expect(captureSchema.safeParse({...item,images:[{url:'https://i.ytimg.com/vi/lmnopqrstuv/hqdefault.jpg',alt:''}]}).success).toBe(false);
   expect(captureTags('youtube',{defaultTags:['YouTube'],addPlatformTag:true})).toEqual(['YouTube']);

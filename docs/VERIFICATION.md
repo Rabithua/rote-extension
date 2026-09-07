@@ -138,3 +138,7 @@ Live confirmation: on the public cee.wtf post in disposable Chromium, holding th
 ## 0.4.2 Simplify Bluesky note body
 
 Following the selected metadata in the user's screenshot, new Bluesky notes contain only post text and source URL, with static images still attached. Author display name, handle and timestamp are omitted from the note body; capture metadata remains available for the recent-task title. Existing Rote notes are not edited. Validation: lint, typecheck, production build, 48 unit tests and the targeted Bluesky multi-image browser save scenario passed, with an exact assertion for the simplified body.
+
+## 0.4.3 Omit added attribution across all sources
+
+Removed extra author/handle/timestamp lines from X, channel names from YouTube, and bylines from Bilibili, Hacker News and arXiv note bodies. Bluesky was already simplified. Titles, original text, source/quote links and images remain. GitHub owner/repo remains the repository identifier. Original text containing names or dates is not rewritten. Existing Rote notes are not modified. Validation: lint, typecheck, build, 49 unit tests and five targeted Chromium saves covering X, YouTube, Bilibili, HN/arXiv and Bluesky passed.

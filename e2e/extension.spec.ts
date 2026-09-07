@@ -358,7 +358,7 @@ test('YouTube card menus and watch buttons share a video task with its cover',as
   const row=page.locator('[data-rote-youtube=menu]');await expect(row).toHaveText('Save to Rote');
   await page.keyboard.press('End');await expect(row).toBeFocused();await page.keyboard.press('Enter');
   await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
-  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);expect(state.data.notes[0].tags).toEqual(['YouTube']);expect(state.data.notes[0].content).toContain('Full video title\n\nTest Channel');
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);expect(state.data.notes[0].tags).toEqual(['YouTube']);expect(state.data.notes[0].content).toBe('Full video title\n\nhttps://www.youtube.com/watch?v=abcdefghijk');
   await page.goto('https://www.youtube.com/watch?v=abcdefghijk');const button=page.locator('[data-rote-youtube=watch]');await expect(button).toHaveText('Saved to Rote');await expect(button).toBeDisabled();
   await expect(settings.getByRole('link',{name:'Open video'})).toBeVisible();
   await page.getByRole('button',{name:'More actions'}).nth(1).click();await expect(row).toHaveText('Save to Rote');await row.click({position:{x:3,y:3}});await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(2);
