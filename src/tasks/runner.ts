@@ -25,7 +25,7 @@ export class SaveRunner {
       const existing = await this.deps.store.get(id);
       if (existing) return existing;
       const now = new Date().toISOString();
-      const task: SaveTask = { id, configId: settings.id, capture, status: 'queued', createdAt: now, updatedAt: now, uploaded: [], batches: [], finalized: [] };
+      const task: SaveTask = { id, configId: settings.id, capture, noteDefaults: { tags: [...settings.defaultTags], visibility: settings.defaultVisibility }, status: 'queued', createdAt: now, updatedAt: now, uploaded: [], batches: [], finalized: [] };
       await this.persist(task);
       return task;
     });
@@ -81,7 +81,7 @@ export class SaveRunner {
       delete task.error; delete task.permissionOrigin;
       if (!task.noteId) {
         task.status = 'creating'; await this.persist(task);
-        const note = await client.createNote(task.capture);
+        const note = await client.createNote(task.capture, task.noteDefaults ?? { tags: [], visibility: 'private' });
         task.noteId = note.id;
         task.status = 'uploading'; await this.persist(task);
       }

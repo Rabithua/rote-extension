@@ -5,7 +5,7 @@ import type { SaveTask } from '../src/domain/task';
 import { MissingHostPermission } from '../src/tasks/images';
 import { capture } from './fixtures';
 
-const settings = {id:'account-a',apiUrl:'https://api.example.test',openKey:'11111111-1111-4111-8111-111111111111',theme:'system' as const,language:'en' as const};
+const settings = {defaultTags: [] as string[], defaultVisibility: 'private' as const,id:'account-a',apiUrl:'https://api.example.test',openKey:'11111111-1111-4111-8111-111111111111',theme:'system' as const,language:'en' as const};
 function harness() {
   const tasks = new Map<string, SaveTask>();
   const blobs = new Map<string,Blob>();
@@ -103,4 +103,17 @@ describe('durable save workflow', () => {
     expect(h.tasks.get(task.id)?.status).toBe('failed');
     await h.runner.start(task.id); expect(h.tasks.get(task.id)?.status).toBe('saved');
   });
+});
+
+it('keeps capture-time defaults after settings change and uses private for legacy tasks', async () => {
+  const h=harness();
+  const task=await h.runner.enqueue(capture(),{...settings,defaultTags:['X'],defaultVisibility:'public'});
+  h.deps.settings=async()=>({...settings,defaultTags:['changed']});
+  await h.runner.start(task.id);
+  expect(h.client.createNote).toHaveBeenCalledWith(task.capture,{tags:['X'],visibility:'public'});
+  const legacy=await h.runner.enqueue(capture('456'),settings);
+  delete legacy.noteDefaults; await h.deps.store.put(legacy);
+  h.deps.settings=async()=>({...settings,defaultTags:['public'],defaultVisibility:'public'});
+  await h.runner.start(legacy.id);
+  expect(h.client.createNote).toHaveBeenLastCalledWith(legacy.capture,{tags:[],visibility:'private'});
 });

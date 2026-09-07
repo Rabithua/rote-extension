@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CaptureItem } from '../domain/capture';
+import type { NoteDefaults } from '../domain/task';
 import { noteContent } from '../domain/capture';
 
 const attachmentSchema = z.object({ id: z.string().uuid(), url: z.string(), details: z.object({ key: z.string().optional() }).nullable().optional() });
@@ -36,8 +37,8 @@ export class RoteClient {
   async permissions() {
     return z.object({ permissions: z.array(z.string()) }).parse(await this.call('/permissions', 'GET')).permissions;
   }
-  async createNote(capture: CaptureItem): Promise<RoteNote> {
-    const data = await this.call('/notes', 'POST', { content: noteContent(capture), title: '', state: 'private', tags: [], editor: 'normal', pin: false });
+  async createNote(capture: CaptureItem, defaults: NoteDefaults = { tags: [], visibility: 'private' }): Promise<RoteNote> {
+    const data = await this.call('/notes', 'POST', { content: noteContent(capture), title: '', state: defaults.visibility, tags: defaults.tags, editor: 'normal', pin: false });
     const parsed = noteSchema.safeParse(data);
     if (!parsed.success) throw new ApiFailure(201, true);
     return parsed.data;

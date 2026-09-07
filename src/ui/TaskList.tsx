@@ -20,7 +20,7 @@ export function TaskList({ tasks, t, reload, compact = false }: { tasks: TaskVie
   }
   return <section className="section" aria-labelledby="activity-heading">
     <h2 id="activity-heading">{t('activity')}</h2>
-    {!tasks.length ? <div className="empty"><h3>{t('emptyTitle')}</h3><p>{t('emptyBody')}</p><p className="hint">{t('private')}</p></div> : null}
+    {!tasks.length ? <div className="empty"><h3>{t('emptyTitle')}</h3><p>{t('emptyBody')}</p><p className="hint">{t('captureDefaultsHint')}</p></div> : null}
     {(compact ? tasks.slice(0,3) : tasks).map(task => {
       const active = ['queued','creating','uploading','finalizing'].includes(task.status);
       const Icon = task.status === 'saved' ? Check : active ? LoaderCircle : AlertCircle;

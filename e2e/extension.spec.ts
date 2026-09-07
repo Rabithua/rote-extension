@@ -118,3 +118,27 @@ test('supports corner clicks across routes, narrow layout and zoom, and rejects 
   await page.locator('[data-rote-capture]').click();
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(4);
 });
+
+test('persists default tags and visibility and keeps saved-note settings during retries',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId,'zh');
+  await settings.locator('#defaultTags').fill('#X， 阅读, X');
+  await settings.locator('#defaultVisibility').selectOption('public');
+  await settings.locator('button[type=submit]').click();
+  await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  await settings.reload();
+  await expect(settings.locator('#defaultTags')).toHaveValue('X, 阅读');
+  await expect(settings.locator('#defaultVisibility')).toHaveValue('public');
+  const page=await openX(context);
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});
+  await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
+  await expect(settings.getByText('文字已保存，图片待补传',{exact:true})).toBeVisible();
+  await settings.locator('#defaultTags').fill('新标签');await settings.locator('#defaultVisibility').selectOption('private');
+  await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  await settings.getByRole('button',{name:'重试',exact:true}).click();await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
+  await expect(settings.getByText('已保存到 Rote',{exact:true})).toHaveCount(2);
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
+  expect(state.data.notes).toHaveLength(2);
+  expect(state.data.notes[0]).toMatchObject({state:'public',tags:['X','阅读']});
+  expect(state.data.notes[1]).toMatchObject({state:'private',tags:['新标签']});
+});

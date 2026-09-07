@@ -1,11 +1,14 @@
 import type { CaptureItem } from './capture';
 import type { UploadManifest } from '../rote/client';
 
+export interface NoteDefaults { tags: string[]; visibility: 'private' | 'public' }
+
 export type TaskStatus = 'queued' | 'creating' | 'uploading' | 'finalizing' | 'saved' | 'failed' | 'uncertain';
 export interface SaveTask {
   id: string;
   configId: string;
   capture: CaptureItem;
+  noteDefaults?: NoteDefaults;
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;

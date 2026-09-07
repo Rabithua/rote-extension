@@ -5,6 +5,8 @@ export const settingsSchema = z.object({
   openKey: z.string().trim().uuid(),
   language: z.enum(['system', 'zh', 'en']),
   theme: z.enum(['system', 'light', 'dark']),
+  defaultTags: z.array(z.string().trim().min(1).max(50)).max(20).transform(tags => [...new Set(tags)]).default([]),
+  defaultVisibility: z.enum(['private', 'public']).default('private'),
 });
 export type SettingsInput = z.input<typeof settingsSchema>;
 export type Settings = z.output<typeof settingsSchema> & { id: string };
@@ -34,3 +36,7 @@ export async function writeSettings(input: SettingsInput): Promise<Settings> {
   return settings;
 }
 export const originPattern = (url: string) => `${new URL(url).origin}/*`;
+
+export function parseDefaultTags(value: string): string[] {
+  return [...new Set(value.split(/[,，\n]/).map(tag => tag.trim().replace(/^#+/, '').trim()).filter(Boolean))];
+}

@@ -1,4 +1,8 @@
 export const en = {
+  defaultTags: 'Default tags', tagsHint: 'Separate tags with commas. Leave blank for no tags. Up to 20 tags, 50 characters each.',
+  defaultVisibility: 'Default visibility', visibilityPrivate: 'Private', visibilityPublic: 'Public',
+  privateHint: 'New captures are visible only to you.', publicHint: 'New captures will be public in Rote.',
+  captureDefaultsHint: 'New captures use the tags and visibility in extension settings.',
   app: 'Rote', tagline: 'Keep what matters.', settings: 'Connection', activity: 'Recent captures',
   connectionHint: 'Connect once. Save directly from the share menu on X.', apiUrl: 'Rote service address',
   openKey: 'OpenKey', keyHint: 'Requires SENDROTE, UPLOADATTACHMENT and GETROTE. Stored only in this browser.',
@@ -15,7 +19,7 @@ export const en = {
   unsupported: 'Could not read this post. Open its detail page and try again.',
   missing_permissions: 'This OpenKey needs SENDROTE, UPLOADATTACHMENT and GETROTE.',
   host_permission: 'Allow access to this server to continue.', invalid_address: 'Use an HTTPS service address (HTTP is allowed for localhost).',
-  invalid_input: 'Check the service address and OpenKey.', not_allowed: 'This request is not allowed.',
+  invalid_input: 'Check the connection settings and tag lengths.', not_allowed: 'This request is not allowed.',
   save_failed: 'Could not complete the save. Your task is kept for recovery.',
   image_download: 'Could not download an image. Retry when connected.', image_upload: 'Image upload failed. Retry to continue this note.',
   image_type: 'This image format is not supported.', image_size: 'An image exceeds Rote’s 20 MB limit.',
@@ -30,6 +34,10 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const zh: Record<MessageKey, string> = {
+  defaultTags: '默认标签', tagsHint: '多个标签用逗号分隔，留空则不添加；最多 20 个标签，每个最多 50 个字符。',
+  defaultVisibility: '默认可见性', visibilityPrivate: '私密', visibilityPublic: '公开',
+  privateHint: '新采集的笔记仅自己可见。', publicHint: '新采集的笔记将在 Rote 中公开可见。',
+  captureDefaultsHint: '新采集使用扩展设置中的默认标签和可见性。',
   app: 'Rote', tagline: '留住值得记下的内容。', settings: '连接设置', activity: '最近采集',
   connectionHint: '连接一次，即可从 X 的分享菜单直接保存。', apiUrl: 'Rote 服务地址',
   openKey: 'OpenKey', keyHint: '需要 SENDROTE、UPLOADATTACHMENT 和 GETROTE 权限，仅保存在当前浏览器。',
@@ -45,7 +53,7 @@ export const zh: Record<MessageKey, string> = {
   empty_capture: '这条帖子没有可采集的文字或静态图片。', unsupported: '无法读取这条帖子，请打开详情页后重试。',
   missing_permissions: '此 OpenKey 需要 SENDROTE、UPLOADATTACHMENT 和 GETROTE 权限。',
   host_permission: '需要允许访问此服务器才能继续。', invalid_address: '请使用 HTTPS 服务地址，本地 localhost 可使用 HTTP。',
-  invalid_input: '请检查服务地址和 OpenKey。', not_allowed: '无法执行此请求。',
+  invalid_input: '请检查连接设置及标签长度。', not_allowed: '无法执行此请求。',
   save_failed: '暂时无法完成保存，任务已保留，可稍后恢复。',
   image_download: '图片下载失败，请联网后重试。', image_upload: '图片上传失败，重试会继续补传到同一条笔记。',
   image_type: '暂不支持此图片格式。', image_size: '图片超过 Rote 的 20 MB 限制。',

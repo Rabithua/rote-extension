@@ -31,3 +31,9 @@ describe('Rote API contract', () => {
     expect(url.searchParams.get('openkey')).toBe(key);
   });
 });
+
+it('sends explicitly selected public visibility and tags', async () => {
+  const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({data:{id:crypto.randomUUID(),content:'saved'}})));
+  await new RoteClient(config,request).createNote(capture(),{tags:['X','阅读'],visibility:'public'});
+  expect(JSON.parse(request.mock.calls[0]![1]!.body as string)).toMatchObject({state:'public',tags:['X','阅读']});
+});
