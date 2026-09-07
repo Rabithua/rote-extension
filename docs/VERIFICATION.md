@@ -41,3 +41,9 @@
 ## 0.1.2 独立设置标签页
 
 将 options_ui.open_in_tab 设置为 true。生产构建通过；真实 Chromium 验证：点击工具栏弹窗的设置按钮，打开顶层 options.html 标签页，默认标签设置控件可见。设置数据保持不变。
+
+## 0.1.3 工具栏入口与升级兼容
+
+移除 action.default_popup 和 popup 构建入口，注册 action.onClicked 打开独立设置页。默认标签字段加入前端旧协议数据校验与空值兼容，防止旧后台回复缺少 defaultTags 时调用 join 崩溃。关闭 Vite 模块预加载，产物没有 modulepreload 链接；设置页面正常加载所需的 script/CSS。
+
+lint、类型检查、24 项单元测试、10 项 Chromium 测试及生产构建通过。新增浏览器验收模拟旧后台回复，确认默认标签为空、可见性私密且无 pageerror；检查工具栏无 popup、click handler 已注册，并验证其调用的 openOptionsPage 打开独立设置标签页。历史错误条目不会因安装新版本而自动清除。

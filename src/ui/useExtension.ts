@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Settings } from '../settings/store';
+import { storedSettingsSchema, type Settings } from '../settings/store';
 import type { TaskView } from '../domain/task';
 import { send } from '../messaging/protocol';
 import { languageFor, translate } from '../locales/messages';
@@ -13,7 +13,7 @@ export function useExtension() {
   const load = useCallback(async () => {
     try {
       const data = await send({ type: 'settings:get' });
-      setSettings(data.settings ?? null);
+      setSettings(data.settings ? storedSettingsSchema.parse(data.settings) : null);
       if (data.settings) await reloadTasks();
     } catch (error) { setError(error instanceof Error ? error.message : 'save_failed'); }
     finally { setLoaded(true); }

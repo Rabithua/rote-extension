@@ -28,6 +28,7 @@ function changed(task: SaveTask) {
     : chrome.tabs.sendMessage(tab.id, { type: 'task:changed', task: taskView(task) }).catch(() => undefined))));
 }
 export function installBackground() {
+  chrome.action.onClicked.addListener(() => { void chrome.runtime.openOptionsPage(); });
   const runner = new SaveRunner({ store: taskStore, settings: readSettings, client: settings => new RoteClient(settings),
     download: downloadImage, upload: uploadImage, changed });
   const ready = protectStorage();

@@ -142,3 +142,33 @@ test('persists default tags and visibility and keeps saved-note settings during 
   expect(state.data.notes[0]).toMatchObject({state:'public',tags:['X','阅读']});
   expect(state.data.notes[1]).toMatchObject({state:'private',tags:['新标签']});
 });
+test('renders legacy worker settings without crashing on missing tags',async({context,extensionId})=>{
+  const page=await context.newPage();const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.addInitScript(({key})=>{
+    // Reproduce an older background worker replying to an updated settings page.
+    const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage=(async(message: {type:string})=>{
+      if(message.type==='settings:get')return {ok:true,data:{settings:{id:'legacy',apiUrl:'http://127.0.0.1:43119',openKey:key,language:'en',theme:'light'}}};
+      if(message.type==='tasks:list')return {ok:true,data:{tasks:[]}};
+      return original(message);
+    }) as typeof chrome.runtime.sendMessage;
+  },{key:testKey});
+  await page.goto(`chrome-extension://${extensionId}/options.html`);
+  await expect(page.locator('#defaultTags')).toHaveValue('');
+  await expect(page.locator('#defaultVisibility')).toHaveValue('private');
+  await expect(page.locator('button[type=submit]')).toBeVisible();
+  expect(errors).toEqual([]);
+  await expect(page.locator('link[rel=modulepreload]')).toHaveCount(0);
+});
+test('registers a toolbar action without a popup and opens standalone settings',async({context,extensionId})=>{
+  const worker=context.serviceWorkers()[0]!;
+  const config=await worker.evaluate(()=>({manifest:chrome.runtime.getManifest(),clickHandler:chrome.action.onClicked.hasListeners()}));
+  expect(config.manifest.action?.default_popup).toBeUndefined();
+  expect(config.manifest.options_ui?.open_in_tab).toBe(true);expect(config.clickHandler).toBe(true);
+  // Exercise the browser API called by the registered toolbar handler.
+  await worker.evaluate(()=>chrome.runtime.openOptionsPage());
+  await expect.poll(()=>context.pages().map(page=>page.url())).toContain(`chrome-extension://${extensionId}/options.html`);
+  const page=context.pages().find(page=>page.url().endsWith('/options.html'))!;
+  await expect(page.locator('#defaultTags')).toBeVisible();
+});

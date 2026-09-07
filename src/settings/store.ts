@@ -8,6 +8,7 @@ export const settingsSchema = z.object({
   defaultTags: z.array(z.string().trim().min(1).max(50)).max(20).transform(tags => [...new Set(tags)]).default([]),
   defaultVisibility: z.enum(['private', 'public']).default('private'),
 });
+export const storedSettingsSchema = settingsSchema.extend({ id: z.string() });
 export type SettingsInput = z.input<typeof settingsSchema>;
 export type Settings = z.output<typeof settingsSchema> & { id: string };
 export function normalizeApiUrl(value: string): string {
@@ -26,7 +27,7 @@ export async function protectStorage() {
 }
 export async function readSettings(): Promise<Settings | null> {
   const { settings } = await chrome.storage.local.get('settings');
-  return settings ? settingsSchema.extend({ id: z.string() }).parse(settings) : null;
+  return settings ? storedSettingsSchema.parse(settings) : null;
 }
 export async function writeSettings(input: SettingsInput): Promise<Settings> {
   const parsed = settingsSchema.parse(input);

@@ -10,7 +10,7 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
   const [openKey, setOpenKey] = useState(settings?.openKey ?? '');
   const [language, setLanguage] = useState<SettingsInput['language']>(settings?.language ?? 'system');
   const [theme, setTheme] = useState<SettingsInput['theme']>(settings?.theme ?? 'system');
-  const [defaultTags, setDefaultTags] = useState(settings?.defaultTags.join(', ') ?? '');
+  const [defaultTags, setDefaultTags] = useState(settings?.defaultTags?.join(', ') ?? '');
   const [defaultVisibility, setDefaultVisibility] = useState<'private' | 'public'>(settings?.defaultVisibility ?? 'private');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
