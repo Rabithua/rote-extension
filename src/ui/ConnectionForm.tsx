@@ -30,7 +30,7 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
   }
   return <section className="section" aria-labelledby="connection-heading">
     <h2 id="connection-heading">{t('settings')}</h2>
-    <p className="subtitle mb-6">{t('connectionHint')}</p>
+    <p className="section-intro">{t('connectionHint')}</p>
     <form onSubmit={submit}>
       <div className="field"><label htmlFor="apiUrl">{t('apiUrl')}</label><Input id="apiUrl" type="url" value={apiUrl} onChange={e => setApiUrl(e.target.value)} required autoComplete="url" /></div>
       <div className="field"><label htmlFor="openKey">{t('openKey')}</label><Input id="openKey" type="password" value={openKey} onChange={e => setOpenKey(e.target.value)} required autoComplete="off" spellCheck={false} aria-describedby="key-hint" /><p className="hint" id="key-hint">{t('keyHint')}</p></div>
