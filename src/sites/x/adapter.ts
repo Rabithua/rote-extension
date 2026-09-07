@@ -39,8 +39,7 @@ export class XAdapter implements SiteAdapter {
     this.row?.remove(); this.row = undefined; this.menu = undefined; this.target = undefined;
   };
   private onKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') this.clearTarget();
-    else if (event.target instanceof Node && this.menu?.contains(event.target)) this.menuKeys(event);
+    if (event.key !== 'Escape' && event.target instanceof Node && this.menu?.contains(event.target)) this.menuKeys(event);
   };
   private onClick = (event: MouseEvent) => {
     if (!(event.target instanceof Element)) return;
@@ -116,10 +115,30 @@ export class XAdapter implements SiteAdapter {
   };
   private closeMenu(trigger: HTMLElement) {
     const menu = this.menu;
-    (menu ?? trigger).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
-    // Host dismissal uses its existing outside-click handler. Do not remove React-owned nodes.
-    if (menu?.isConnected) document.body.click();
-    this.clearTarget(); trigger.focus({ preventScroll: true });
+    if (!menu) return;
+    // Dismiss through X's overlay handler, not a body click or removal of React-owned DOM.
+    // Search outward from this menu so another dialog's mask is never selected.
+    let layer = menu.parentElement;
+    let mask: HTMLElement | undefined;
+    while (layer && layer !== document.body) {
+      mask = Array.from(layer.querySelectorAll<HTMLElement>('[data-testid="mask"]'))
+        .find(element => !menu.contains(element) && element.getClientRects().length > 0);
+      if (mask || layer.id === 'layers') break;
+      layer = layer.parentElement;
+    }
+    if (mask) mask.click();
+    else {
+      // Target a native item: the injected row is outside X's React focus registry.
+      // X's keyboard handlers can use the legacy numeric key fields.
+      const nativeItem = menu.querySelector<HTMLElement>('[role="menuitem"]:not([data-rote-capture])');
+      (nativeItem ?? menu).dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+        bubbles: true, cancelable: true, composed: true,
+      }));
+    }
+    // The observer cleans up after the host removes the menu. Keep the disabled
+    // saving row if host dismissal fails, rather than leaving a misleading empty gap.
+    trigger.focus({ preventScroll: true });
   }
   private updateRow(task: TaskView) {
     if (!this.row || this.row.dataset.roteCapture !== task.sourceId) return;

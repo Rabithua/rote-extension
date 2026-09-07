@@ -7,9 +7,9 @@ export function xFixture(language='en',dark=false) {
   </style></head><body><main><h1 style="padding:16px">${language==='zh'?'主页':'Home'}</h1>${postHtml('1001',picture).replace('Share post',share)}${postHtml('1002').replace('Share post',share)}${postHtml('1003','<button data-testid="tweet-text-show-more-link">Show more</button>').replace('Share post',share)}</main><script>
   document.addEventListener('click',event=>{
     const button=event.target.closest('button[aria-haspopup="menu"]');
-    if(button){document.querySelector('[role=menu]')?.remove();const menu=document.createElement('div');menu.setAttribute('role','menu');menu.innerHTML=['${language==='zh'?'复制链接':'Copy link'}','${language==='zh'?'通过私信发送':'Send via Direct Message'}'].map(text=>'<div role="none"><div role="menuitem" tabindex="0"><div><svg viewBox="0 0 24 24"><path d="M8 7h8v10H8z"/></svg></div><div dir="auto">'+text+'</div></div></div>').join('');document.body.append(menu);menu.querySelector('[role=menuitem]').focus();}
-    else if(!event.target.closest('[role=menu]'))document.querySelector('[role=menu]')?.remove();
+    if(button){document.querySelector('[role=menu]')?.remove();const menu=document.createElement('div');menu.setAttribute('role','menu');menu.innerHTML=['${language==='zh'?'复制链接':'Copy link'}','${language==='zh'?'通过私信发送':'Send via Direct Message'}'].map(text=>'<div role="none"><div role="menuitem" tabindex="0"><div><svg viewBox="0 0 24 24"><path d="M8 7h8v10H8z"/></svg></div><div dir="auto">'+text+'</div></div></div>').join('');const layer=document.createElement("div");layer.dataset.shareLayer="";const mask=document.createElement("div");mask.dataset.testid="mask";mask.style.cssText="position:fixed;inset:0";mask.onclick=()=>layer.remove();layer.append(mask,menu);document.body.append(layer);menu.querySelector('[role=menuitem]').focus();}
+    
   });
-  document.addEventListener('keydown',event=>{if(event.key==='Escape')document.querySelector('[role=menu]')?.remove();});
+  document.addEventListener('keydown',event=>{if(event.keyCode===27)document.querySelector('[data-share-layer]')?.remove();});
   </script></body></html>`;
 }

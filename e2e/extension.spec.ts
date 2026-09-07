@@ -44,6 +44,9 @@ test('saves all images from the correct post, deduplicates and preserves menu st
   const sizes=await page.locator('[role=menuitem]').evaluateAll(items=>items.map(item=>({height:item.getBoundingClientRect().height,padding:getComputedStyle(item).padding,font:getComputedStyle(item).fontSize})));
   expect(sizes[2]).toEqual(sizes[0]);
   await row.click({position:{x:2,y:2}});
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.locator('[data-testid=mask]')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Share post'}).first()).toBeFocused();
   await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
   const result=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(result.data.notes).toHaveLength(1);expect(result.data.notes[0].state).toBe('private');expect(result.data.notes[0].attachments).toHaveLength(2);
@@ -51,6 +54,14 @@ test('saves all images from the correct post, deduplicates and preserves menu st
   await page.getByRole('button',{name:'Share post'}).first().click();await expect(page.locator('[data-rote-capture]')).toHaveText('Saved to Rote');
   await expect(page.locator('[data-rote-capture]')).toHaveAttribute('aria-disabled','true');
   await page.keyboard.press('Escape');await expect(page.locator('[data-rote-capture]')).toHaveCount(0);
+});
+test('dismisses menus without a mask using the native keyboard handler',async({context,extensionId})=>{
+  await connect(context,extensionId);const page=await openX(context);
+  await page.getByRole('button',{name:'Share post'}).nth(1).click();
+  await expect(page.locator('[data-rote-capture]')).toHaveCount(1);
+  await page.locator('[data-testid=mask]').evaluate(element=>element.remove());
+  await page.locator('[data-rote-capture]').click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
 });
 test('handles keyboard focus, repeated menu mounts, Chinese and dark theme',async({context,extensionId})=>{
   const settings=await connect(context,extensionId,'zh');
@@ -65,12 +76,13 @@ test('handles keyboard focus, repeated menu mounts, Chinese and dark theme',asyn
   await page.keyboard.press('End');await expect(page.locator('[data-rote-capture]')).toBeFocused();
   await mkdir('test-results/visuals',{recursive:true});
   await page.screenshot({path:'test-results/visuals/x-menu-dark-zh.png'});
-  await page.keyboard.press('Enter');await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
+  await page.keyboard.press('Enter');await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
   await settings.screenshot({path:'test-results/visuals/settings-dark-zh.png',fullPage:true});
 });
 test('refuses collapsed posts and does not leak settings to a content script',async({context,extensionId})=>{
   await connect(context,extensionId);const page=await openX(context);
   await page.getByRole('button',{name:'Share post'}).nth(2).click();await page.locator('[data-rote-capture]').click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(0);
   expect(await page.evaluate(()=>typeof (window as unknown as {chrome:{runtime?:unknown}}).chrome.runtime)).toBe('undefined');
 });
@@ -94,6 +106,7 @@ test('resumes persisted images after the service worker stops',async({context,ex
   const settings=await connect(context,extensionId);const page=await openX(context);
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'hang-upload'}});
   await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
   await expect.poll(async()=>{const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();return state.data.failure;}).toBe('upload-pending');
   const cdp=await context.newCDPSession(settings);await cdp.send('ServiceWorker.enable');await cdp.send('ServiceWorker.stopAllWorkers');
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:''}});
