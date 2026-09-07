@@ -6,7 +6,7 @@
 
 1. 解压发布 ZIP，保留整个 `chrome-mv3` 文件夹。
 2. 打开 `chrome://extensions`，开启「开发者模式」，点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的 `chrome-mv3` 文件夹。
-3. 打开扩展设置，填写 `https://rote.ink` 和 OpenKey。官方地址会自动转换为 `https://api.rote.ink`；自部署实例请填写 API 根地址。
+3. 打开扩展设置（独立浏览器标签页），填写 `https://rote.ink` 和 OpenKey。官方地址会自动转换为 `https://api.rote.ink`；自部署实例请填写 API 根地址。
 4. OpenKey 需要 `SENDROTE`、`UPLOADATTACHMENT`、`GETROTE`。点击连接并批准该 API 域名访问权限。
 5. 刷新已经打开的 X 页面，打开某条帖子的分享菜单，点击「保存到 Rote」。
 6. 首次上传时，如果对象存储使用另一个域名，文字先保存；在「最近采集」点击授权并重试，只授予任务实际使用的上传域名。
