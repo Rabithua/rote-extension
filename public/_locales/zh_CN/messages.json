@@ -1,8 +1,8 @@
 {
   "extensionName": {
-    "message": "Rote — 从 X、GitHub 和 YouTube 快速记录"
+    "message": "Rote — 网页收藏助手"
   },
   "extensionDescription": {
-    "message": "保存 X、GitHub、YouTube、B站、Hacker News、arXiv、Bluesky 内容，以及网页和文字摘录到 Rote。"
+    "message": "一键收藏网页、摘录文字，将社交帖子、视频、开源项目和论文保存到 Rote。支持图片附件、自定义标签和可见性。"
   }
 }

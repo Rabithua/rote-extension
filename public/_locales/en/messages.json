@@ -1,8 +1,8 @@
 {
   "extensionName": {
-    "message": "Rote — Save from X, GitHub & YouTube"
+    "message": "Rote — Web Clipper"
   },
   "extensionDescription": {
-    "message": "Save content from X, GitHub, YouTube, Bilibili, Hacker News, arXiv and Bluesky, plus webpages and selections, to Rote."
+    "message": "Save webpages, text selections, posts, videos, repositories and papers to Rote, with images, custom tags and visibility."
   }
 }

@@ -142,3 +142,8 @@ Following the selected metadata in the user's screenshot, new Bluesky notes cont
 ## 0.4.3 Omit added attribution across all sources
 
 Removed extra author/handle/timestamp lines from X, channel names from YouTube, and bylines from Bilibili, Hacker News and arXiv note bodies. Bluesky was already simplified. Titles, original text, source/quote links and images remain. GitHub owner/repo remains the repository identifier. Original text containing names or dates is not rewritten. Existing Rote notes are not modified. Validation: lint, typecheck, build, 49 unit tests and five targeted Chromium saves covering X, YouTube, Bilibili, HN/arXiv and Bluesky passed.
+
+
+## 0.4.4 Web Clipper naming
+
+Updated English and Chinese extension names and descriptions to describe multi-site clipping, webpage bookmarks and text selections. Toolbar title uses the localized extension name; README introduction matches. Production build passed and generated manifest/locales were checked, including name/description length limits. Capture behavior is unchanged.

@@ -10,7 +10,7 @@ export default defineConfig({
     description: '__MSG_extensionDescription__',
     default_locale: 'en',
     minimum_chrome_version: '120',
-    action: { default_title: 'Rote' },
+    action: { default_title: '__MSG_extensionName__' },
     permissions: ['storage', 'alarms', 'contextMenus', 'activeTab', 'scripting'],
     host_permissions: [
       'https://x.com/*', 'https://github.com/*', 'https://www.youtube.com/*',

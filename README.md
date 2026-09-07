@@ -1,4 +1,6 @@
-# Rote Extension
+# Rote — 网页收藏助手
+
+一键收藏网页、摘录文字，将社交帖子、视频、开源项目和论文保存到 Rote。支持图片附件、自定义标签和可见性。
 
 支持 X、GitHub、YouTube、B站、Hacker News、arXiv、Bluesky，并通过右键保存普通网页或选中文字。使用 WXT、TypeScript、React、Manifest V3 和 Bun，开发者模式加载。
 
