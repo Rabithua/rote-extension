@@ -2,8 +2,8 @@
 
 基准：[`Rabithua/Rote`](https://github.com/Rabithua/Rote)，commit `b6196a2420cc4f798f3318733e160b315641a09e`，MIT（本仓库 LICENSE 保留原版权）。
 
-- `web/src/components/ui/button.tsx` → `src/ui/components/button.tsx`：保留尺寸、variant、主次层级，只调整本地 `cn` 导入。
-- `web/src/components/ui/input.tsx` → `src/ui/components/input.tsx`：保留原组件比例与状态。
+- `web/src/components/ui/button.tsx` → `src/ui/button.tsx`：保留尺寸、variant、主次层级，只调整本地 `cn` 导入。
+- `web/src/components/ui/input.tsx` → `src/ui/input.tsx`：保留原组件比例与状态。
 - `web/src/styles/index.css` 的主题变量 → `src/ui/styles.css`；扩展布局单独编写，不影响 X 页面。
 - `web/public/ico.svg` → `public/rote.svg`，同源图标制作浏览器尺寸 PNG；X 内标识采用单色 currentColor。
 - OpenKey 接口按当前服务端与 rote-toolkit 的 notes / permissions / attachments 协议实现，客户端不导入 Node 文件系统模块。
