@@ -26,7 +26,7 @@ export class SaveRunner {
       const existing = await this.deps.store.get(id);
       if (existing) return existing;
       const now = new Date().toISOString();
-      const task: SaveTask = { id, configId: settings.id, capture, noteDefaults: { tags: captureTags(capture.site, settings), visibility: settings.defaultVisibility }, status: 'queued', createdAt: now, updatedAt: now, uploaded: [], batches: [], finalized: [] };
+      const task: SaveTask = { id, configId: settings.id, capture, noteDefaults: { tags: captureTags(capture.site, settings, capture.sourceUrl), visibility: settings.defaultVisibility }, status: 'queued', createdAt: now, updatedAt: now, uploaded: [], batches: [], finalized: [] };
       await this.persist(task);
       return task;
     });

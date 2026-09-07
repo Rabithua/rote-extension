@@ -10,9 +10,10 @@ const test=base.extend<{context:BrowserContext;extensionId:string}>({
   context:async ({playwright},use)=>{
     const folder=await mkdtemp(join(tmpdir(),'rote-extension-e2e-'));
     const extension=join(folder,'extension');await cp(resolve('.output/chrome-mv3'),extension,{recursive:true});
+    const bg=join(extension,'background.js'); await writeFile(bg, `globalThis.__roteMenus=[];const add=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=(fn)=>{globalThis.__roteMenus.push(fn);add(fn)};`+await readFile(bg,'utf8'));
     const path=join(extension,'manifest.json');const manifest=JSON.parse(await readFile(path,'utf8'));
     // This permission is added only to the disposable test copy, never to the deliverable.
-    manifest.host_permissions.push('http://127.0.0.1/*');await writeFile(path,JSON.stringify(manifest));
+    manifest.host_permissions.push('http://127.0.0.1/*','https://example.com/*');await writeFile(path,JSON.stringify(manifest));
     const context=await playwright.chromium.launchPersistentContext(join(folder,'profile'),{
       channel:'chromium',headless:true,viewport:{width:1100,height:850},
       args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`],
@@ -391,4 +392,100 @@ test('YouTube refuses a recycled card after its menu has opened',async({context,
   await page.locator('yt-lockup-view-model a').first().evaluate(el=>el.setAttribute('href','/watch?v=lmnopqrstuv'));
   await page.locator('[data-rote-youtube=menu]').click();await expect(page.getByRole('menu')).toHaveCount(0);
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(0);
+});
+
+async function mockPageAPIs(context: BrowserContext) {
+  const worker=context.serviceWorkers()[0]!;
+  await worker.evaluate(()=>{
+    const native=globalThis.fetch;
+    globalThis.fetch=async(input,init)=>{
+      const url=String(input instanceof Request ? input.url : input);
+      if(url.startsWith('https://api.bilibili.com/')) return new Response(JSON.stringify({code:0,data:{bvid:'BV1234567890',title:'Video fixture',pic:'https://i0.hdslb.com/bfs/archive/a.jpg',owner:{name:'Creator'}}}));
+      if(url.startsWith('https://public.api.bsky.app/')) return new Response(JSON.stringify({thread:{post:{uri:'at://did:plc:fixture/app.bsky.feed.post/123',author:{did:'did:plc:fixture',handle:'user.test',displayName:'User'},record:{$type:'app.bsky.feed.post',text:'Full post\nSecond paragraph',createdAt:'2026-09-07T00:00:00.000Z'},embed:{$type:'app.bsky.embed.images#view',images:[1,2].map(i=>({fullsize:`https://cdn.bsky.app/img/feed_fullsize/plain/${i}.jpg`,alt:String(i)}))}}}}));
+      if(url.startsWith('https://i0.hdslb.com/')||url.startsWith('https://cdn.bsky.app/')) return new Response(Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='),c=>c.charCodeAt(0)),{headers:{'content-type':'image/png'}});
+      return native(input,init);
+    };
+  });
+}
+test('Bilibili enters video through SPA, saves cover once and rebuilds button',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://www.bilibili.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><body><main></main><script>function video(){history.pushState({},"","/video/BV1234567890");document.querySelector("main").innerHTML=`<div class="video-toolbar-left"><button class="video-share" style="padding:8px;font:14px Arial">Share</button></div>`}</script></body></html>'}));
+  const page=await context.newPage();await page.goto('https://www.bilibili.com/');await page.evaluate(()=>{(window as unknown as {video:()=>void}).video();});
+  const button=page.locator('[data-rote-page=bilibili]');await expect(button).toHaveCount(1);await button.click({position:{x:2,y:2}});
+  await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Saved to Rote');
+  await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();await expect(button).toBeDisabled();
+  await page.evaluate(()=>{(window as unknown as {video:()=>void}).video();});await expect(button).toHaveCount(1);await expect(button).toBeDisabled();
+  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
+});
+test('HN and arXiv place controls and save main content without comments or PDF',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);
+  await context.route('https://news.ycombinator.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><div class="athing"><span class="titleline"><a href="https://example.com/article">Article</a></span></div><span class="subtext"><span class="subline"><a class="hnuser">author</a> | comments</span></span><div class="toptext">Main text</div><div class="comment">Excluded comment</div></html>'}));
+  const page=await context.newPage();await page.goto('https://news.ycombinator.com/item?id=123');await page.locator('[data-rote-page=hackernews] button').click({position:{x:1,y:1}});
+  await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await context.route('https://arxiv.org/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><head><meta name="citation_title" content="Paper"><meta name="citation_author" content="Author"></head><body><blockquote class="abstract">Abstract: Full abstract</blockquote><div class="full-text"><ul><li><a>PDF</a></li></ul></div></body></html>'}));
+  await page.goto('https://arxiv.org/abs/2401.12345v2');await expect(page.locator('.full-text > [data-rote-page=arxiv]')).toHaveCount(1);await page.locator('[data-rote-page=arxiv] button').click({position:{x:2,y:2}});
+  await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(2);
+  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes[0].content).toContain('https://example.com/article');expect(state.data.notes[0].content).not.toContain('Excluded comment');expect(state.data.notes[1].content).toContain('Full abstract');
+});
+test('Bluesky menu closes and full post plus all images are saved',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://bsky.app/**',r=>r.fulfill({contentType:'text/html',body:`<html lang="en"><body><div data-testid="postThreadItem-by-user.test"><a href="/profile/user.test/post/123">Time</a><button data-testid="postDropdownBtn">More</button></div><script>document.querySelector('button').onclick=()=>{const m=document.createElement('div');m.setAttribute('role','menu');const b=document.createElement('button');b.setAttribute('role','menuitem');b.style.cssText='height:40px;padding:8px';b.textContent='Copy link';m.append(b);document.body.append(m)};document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelector('[role=menu]')?.remove()})</script></body></html>`}));
+  const page=await context.newPage();await page.goto('https://bsky.app/profile/user.test/post/123');await page.getByRole('button',{name:'More'}).click();const button=page.locator('[data-rote-page=bluesky]');await expect(button).toHaveCount(1);await button.click({position:{x:2,y:2}});
+  await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await expect(page.locator('[data-rote-toast]')).toBeVisible();await page.getByRole('button',{name:'More'}).click();await expect(button).toBeDisabled();
+  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(2);expect(state.data.notes[0].content).toContain('Full post\nSecond paragraph');
+});
+
+async function invokeContextCapture(context:BrowserContext,url:string,selection?:string) {
+  await context.serviceWorkers()[0]!.evaluate(async({url,selection})=>{
+    const tabs=await chrome.tabs.query({});const tab=tabs.find(t=>t.url===url)!;
+    const listeners=(globalThis as unknown as {__roteMenus:Array<(info:unknown,tab:unknown)=>void>}).__roteMenus;
+    for(const fn of listeners)fn({menuItemId:selection===undefined?'rote-page':'rote-selection',pageUrl:url,frameId:0,selectionText:selection},tab);
+  },{url,selection});
+}
+test('generic bookmarks and exact multiline selections deduplicate independently',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);await settings.getByRole('switch').click();await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  await context.route('https://example.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><title>Reference</title><p>First paragraph</p><p>Second paragraph</p></html>'}));
+  const page=await context.newPage();const url='https://example.com/a?q=1#section';await page.goto(url);
+  await invokeContextCapture(context,url);await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(1);
+  await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Saved to Rote');
+  await invokeContextCapture(context,url);await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Saved to Rote');
+  await invokeContextCapture(context,url,'First\n\nSecond');await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(2);
+  await invokeContextCapture(context,url,'Other');await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(3);
+  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(3);expect(state.data.notes[1].content).toBe('Reference\n\nFirst\n\nSecond\n\n'+url);expect(state.data.notes[0].tags).toContain('example.com');
+});
+test('generic capture guides setup',async({context,extensionId})=>{
+  await context.route('https://example.com/**',r=>r.fulfill({contentType:'text/html',body:'<title>Reference</title><p>Text</p>'}));const page=await context.newPage();await page.goto('https://example.com/');
+  await invokeContextCapture(context,'https://example.com/');await expect.poll(()=>context.pages().some(p=>p.url()===`chrome-extension://${extensionId}/options.html`)).toBe(true);
+  await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Connect Rote');
+});
+test('Bilibili discards extraction after navigation while the API is pending',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  await context.serviceWorkers()[0]!.evaluate(()=>{const native=fetch;globalThis.fetch=async(input,init)=>{if(String(input).startsWith('https://api.bilibili.com/')){await new Promise(r=>setTimeout(r,500));throw new Error('offline')}return native(input,init)};});
+  await context.route('https://www.bilibili.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><link rel="canonical" href="https://www.bilibili.com/video/BV1234567890"><h1 class="video-title">A</h1><div class="video-toolbar-left"><button class="video-share">Share</button></div></html>'}));
+  const page=await context.newPage();await page.goto('https://www.bilibili.com/video/BV1234567890');await page.locator('[data-rote-page]').click();
+  await page.evaluate(()=>{history.pushState({},'','/video/BV9999999999');document.querySelector('h1')!.textContent='B';document.querySelector('link')!.setAttribute('href',location.href)});
+  await page.waitForTimeout(700);const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(0);await expect(page.locator('[data-rote-page]')).toHaveText('Save to Rote');
+});
+test('Bilibili cover task survives page close and worker restart using persisted Blob',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://www.bilibili.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><div class="video-toolbar-left"><button class="video-share">Share</button></div></html>'}));
+  const page=await context.newPage();await page.goto('https://www.bilibili.com/video/BV1234567890');await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'hang-upload'}});await page.locator('[data-rote-page]').click();
+  await expect.poll(async()=> (await(await context.request.get('http://127.0.0.1:43119/__state')).json()).data.failure).toBe('upload-pending');await page.close();
+  const cdp=await context.newCDPSession(settings);await cdp.send('ServiceWorker.enable');await cdp.send('ServiceWorker.stopAllWorkers');await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:''}});await settings.reload();await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible({timeout:30000});
+  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
+});
+test('generic creation failure recovers after source closes without duplicate notes',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);await context.route('https://example.com/**',r=>r.fulfill({contentType:'text/html',body:'<title>Reference</title><p>Text</p>'}));const page=await context.newPage();await page.goto('https://example.com/');
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'create403'}});await invokeContextCapture(context,'https://example.com/');await expect(settings.getByRole('button',{name:'Retry',exact:true})).toBeVisible();await page.close();await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);
+});
+test('Bluesky nested menu preserves native typography and contains the entire row at zoom',async({context,extensionId})=>{
+  await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://bsky.app/**',r=>r.fulfill({contentType:'text/html',body:`<html lang="zh"><body style="background:#151b23;color:white"><div data-testid="postThreadItem-by-user.test"><a href="/profile/user.test/post/123">Time</a><button data-testid="postDropdownBtn">More</button></div><script>document.querySelector('button').onclick=()=>{const m=document.createElement('div');m.setAttribute('role','menu');m.style.cssText='position:fixed;left:12px;top:80px;width:200px';m.innerHTML='<div style="padding:4px;background:#222;border-radius:8px"><div role="menuitem" tabindex="0" style="display:flex;flex-direction:row;align-items:center;padding:8px 10px;height:36px;box-sizing:border-box"><span dir="auto" style="font:600 13px/17px Arial;color:white">复制帖文文字</span></div></div>';document.body.append(m)};document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelector('[role=menu]')?.remove()})</script></body></html>`}));
+  const page=await context.newPage();await page.setViewportSize({width:360,height:600});await page.goto('https://bsky.app/profile/user.test/post/123');await page.evaluate(()=>{document.body.style.zoom='1.25'});await page.getByRole('button',{name:'More'}).click();
+  const row=page.locator('[data-rote-page]');await expect(row).toHaveText('保存到 Rote');
+  const geometry=await row.evaluate(e=>{const s=getComputedStyle(e);const b=e.getBoundingClientRect(),p=e.parentElement!.getBoundingClientRect();return {font:s.fontSize,weight:s.fontWeight,height:b.height,inside:b.bottom<=p.bottom&&b.right<=p.right}});expect(geometry).toEqual({font:'13px',weight:'600',height:45,inside:true});
+  await page.getByRole('menuitem').first().focus();
+  await page.keyboard.press('End');await expect(row).toBeFocused();await row.click({position:{x:3,y:3}});await expect(page.getByRole('menu')).toHaveCount(0);
 });

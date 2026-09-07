@@ -1,3 +1,5 @@
+import { installWebCapture, webChanged } from '../web/background';
+import { remoteCapture } from '../sites/page/remote';
 import { z } from 'zod';
 import { captureSchema } from '../domain/capture';
 import { taskView, type SaveTask } from '../domain/task';
@@ -9,22 +11,34 @@ import { downloadImage, uploadImage } from '../tasks/images';
 import type { Reply, ResponseData } from './protocol';
 
 const requestSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('page:extract'), site: z.enum(['bilibili', 'bluesky']), url: z.string().url() }),
   z.object({ type: z.literal('capture'), capture: captureSchema }),
-  z.object({ type: z.literal('status'), site: z.enum(['x','github','youtube']), sourceId: z.string().min(1).max(200) }),
+  z.object({ type: z.literal('status'), site: z.enum(['x','github','youtube','bilibili','hackernews','arxiv','bluesky']), sourceId: z.string().min(1).max(300) }),
   z.object({ type: z.literal('open-settings') }),
   z.object({ type: z.literal('settings:get') }),
   z.object({ type: z.literal('settings:save'), settings: settingsSchema }),
   z.object({ type: z.literal('tasks:list') }),
-  z.object({ type: z.literal('tasks:retry'), id: z.string().max(200) }),
-  z.object({ type: z.literal('tasks:reconcile'), id: z.string().max(200) }),
+  z.object({ type: z.literal('tasks:retry'), id: z.string().max(400) }),
+  z.object({ type: z.literal('tasks:reconcile'), id: z.string().max(400) }),
 ]);
+const siteOrigins = {
+  'https://x.com': 'x', 'https://github.com': 'github', 'https://www.youtube.com': 'youtube',
+  'https://www.bilibili.com': 'bilibili', 'https://news.ycombinator.com': 'hackernews',
+  'https://arxiv.org': 'arxiv', 'https://bsky.app': 'bluesky',
+} as const;
+const siteTabs: Record<(typeof siteOrigins)[keyof typeof siteOrigins], string> = {
+  x: 'https://x.com/*', github: 'https://github.com/*', youtube: 'https://www.youtube.com/*',
+  bilibili: 'https://www.bilibili.com/*', hackernews: 'https://news.ycombinator.com/*',
+  arxiv: 'https://arxiv.org/*', bluesky: 'https://bsky.app/*',
+};
 export function isTrustedPage(sender: chrome.runtime.MessageSender): boolean {
   return sender.id === chrome.runtime.id && [chrome.runtime.getURL('options.html'), chrome.runtime.getURL('popup.html')].some(url => sender.url?.split('?')[0] === url);
 }
 function changed(task: SaveTask) {
   void chrome.runtime.sendMessage({ type: 'task:changed', task: taskView(task) }).catch(() => undefined);
   // Never include credentials or signed upload URLs in content-script notifications.
-  void chrome.tabs.query({ url: task.capture.site === 'x' ? 'https://x.com/*' : task.capture.site === 'github' ? 'https://github.com/*' : 'https://www.youtube.com/*' }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
+  if (task.capture.site === 'web') { void webChanged(task); return; }
+  void chrome.tabs.query({ url: siteTabs[task.capture.site] }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
     : chrome.tabs.sendMessage(tab.id, { type: 'task:changed', task: taskView(task) }).catch(() => undefined))));
 }
 export function installBackground() {
@@ -33,12 +47,17 @@ export function installBackground() {
     download: downloadImage, upload: uploadImage, changed });
   const ready = protectStorage();
   const start = (id: string) => { void runner.start(id).catch(() => chrome.action.setBadgeText({ text: '!' })); };
+  installWebCapture(runner, start);
   async function handle(raw: unknown, sender: chrome.runtime.MessageSender): Promise<ResponseData> {
     await ready;
     if (sender.id !== chrome.runtime.id) throw new Error('not_allowed');
     const request = requestSchema.parse(raw);
     const trusted = isTrustedPage(sender);
     if (!trusted && !isSiteRequestAllowed(sender, request)) throw new Error('not_allowed');
+    if (request.type === 'page:extract') {
+      if (!trusted && (await chrome.tabs.get(sender.tab!.id!)).url !== request.url) throw new Error('not_allowed');
+      return { capture: await remoteCapture(request) };
+    }
     const settings = await readSettings();
     if (request.type === 'open-settings') { await chrome.runtime.openOptionsPage(); return {}; }
     if (request.type === 'settings:get') return { settings };
@@ -58,7 +77,10 @@ export function installBackground() {
       return { task: taskView(task) };
     }
     if (request.type === 'status') {
-      const task = await taskStore.get(`${settings.id}:${request.site}:${request.sourceId}`);
+      let sourceId = request.sourceId;
+      if (request.site === 'bluesky' && !sourceId.startsWith('did:')) sourceId = (await remoteCapture({ site: 'bluesky', url: `https://bsky.app/profile/${sourceId}` })).sourceId;
+      if (request.site === 'bilibili' && sourceId.startsWith('av')) sourceId = (await remoteCapture({ site: 'bilibili', url: `https://www.bilibili.com/video/${sourceId}` })).sourceId;
+      const task = await taskStore.get(`${settings.id}:${request.site}:${sourceId}`);
       return { task: task ? taskView(task) : undefined };
     }
     if (request.type === 'tasks:list') return { tasks: (await taskStore.list(settings.id)).map(taskView) };
@@ -69,7 +91,7 @@ export function installBackground() {
     return {};
   }
   chrome.runtime.onMessage.addListener((raw: unknown, sender, reply: (value: Reply) => void) => {
-    if (!raw || typeof raw !== 'object' || !('type' in raw) || raw.type === 'task:changed') return false;
+    if (!raw || typeof raw !== 'object' || !('type' in raw) || raw.type === 'task:changed' || raw.type === 'web:settings') return false;
     void handle(raw, sender).then(data => reply({ ok: true, data }), error => reply({ ok: false, error:
       error instanceof ApiFailure ? `api_${error.status}` : error instanceof z.ZodError ? 'invalid_input'
         : error instanceof Error && ['not_allowed','host_permission','missing_permissions','not_configured','invalid_address','tag_limit'].includes(error.message) ? error.message : 'save_failed' }));
@@ -85,9 +107,9 @@ export function installBackground() {
 
 export function isSiteRequestAllowed(sender: chrome.runtime.MessageSender, request: z.infer<typeof requestSchema>): boolean {
   if (!sender.tab || sender.frameId !== 0 || !sender.url) return false;
-  const origin = new URL(sender.url).origin;
-  const site = origin === 'https://x.com' ? 'x' : origin === 'https://github.com' ? 'github' : origin === 'https://www.youtube.com' ? 'youtube' : undefined;
+  const origin = new URL(sender.url).origin as keyof typeof siteOrigins;
+  const site = siteOrigins[origin];
   if (!site) return false;
-  return request.type === 'open-settings' || (request.type === 'capture' && request.capture.site === site)
+  return (request.type === 'page:extract' && request.site === site && new URL(request.url).origin === origin) || request.type === 'open-settings' || (request.type === 'capture' && request.capture.site === site)
     || (request.type === 'status' && request.site === site);
 }

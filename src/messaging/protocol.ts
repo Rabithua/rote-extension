@@ -3,6 +3,7 @@ import type { TaskView } from '../domain/task';
 import type { Settings, SettingsInput } from '../settings/store';
 
 export type Request =
+  | { type: 'page:extract'; site: 'bilibili' | 'bluesky'; url: string }
   | { type: 'capture'; capture: CaptureItem }
   | { type: 'status'; site: CaptureItem['site']; sourceId: string }
   | { type: 'open-settings' }
@@ -11,7 +12,7 @@ export type Request =
   | { type: 'tasks:list' }
   | { type: 'tasks:retry'; id: string }
   | { type: 'tasks:reconcile'; id: string };
-export interface ResponseData { task?: TaskView; tasks?: TaskView[]; settings?: Settings | null; permissions?: string[] }
+export interface ResponseData { capture?: CaptureItem; task?: TaskView; tasks?: TaskView[]; settings?: Settings | null; permissions?: string[] }
 export type Reply = { ok: true; data: ResponseData } | { ok: false; error: string };
 export async function send(request: Request): Promise<ResponseData> {
   const reply = await chrome.runtime.sendMessage(request) as Reply;
