@@ -161,3 +161,10 @@ The additional old published text-cache scenario passed, bringing browser covera
 On September 7, 2026, version 0.4.4 was uploaded to existing item cahpbdbfdfnmoachkjmcfgbbnmjcbpej. The first listing submission received Yellow Argon for excessive platform keywords. Both descriptions were rewritten around functionality without platform lists, then resubmitted successfully. The dashboard showed Pending review, with automatic publication after approval selected. This is not a claim of review approval.
 
 The new public repository is Rabithua/rote-extension. Old repository Rabithua/Rote_chromeExtension was backed up locally (Git mirror, issues/comments, PRs/reviews/commits/files and metadata), deleted with explicit user authorization, and verified as HTTP 404.
+
+
+## 0.4.5 Default archive setting
+
+Added an opt-in default archive switch using the existing control dimensions. All captures snapshot the archive preference when queued; retries retain it. Archived uncertain creates use an archived search filter for reconciliation. Older settings/tasks default to unarchived. Reduced page bottom padding from 40px to 20px.
+
+Lint, typecheck, 54 unit tests and all 38 Chromium scenarios passed before the final padding-only adjustment; production build and both settings/layout Chromium scenarios passed again afterward. Browser coverage includes persisted archive settings, label/corner/keyboard interactions, and keeping capture-time defaults through image recovery. A private archived note was verified against the live Rote API, including discovery through the archived reconciliation search. The dark Chinese settings screenshot was inspected; existing control proportions are preserved. Version 0.4.5 is prepared for local loading; this work does not replace the pending 0.4.4 store submission.

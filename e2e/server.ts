@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
 type Attachment = {id:string;url:string;details:{key:string}};
-type Note = {id:string;content:string;state:string;tags:string[];attachments:Attachment[]};
+type Note = {id:string;content:string;state:string;archived:boolean;tags:string[];attachments:Attachment[]};
 const notes: Note[] = [];
 const uploads = new Map<string,number>();
 let failure = '';
@@ -28,7 +28,7 @@ const server=createServer(async (req,res)=>{
   if(path==='/permissions'){reply({permissions:['SENDROTE','UPLOADATTACHMENT','GETROTE']});return;}
   if(path==='/notes' && req.method==='POST'){
     if(failure==='create403'){failure='';reply({},403);return;}
-    const note={id:randomUUID(),content:body.content,state:body.state,tags:body.tags,attachments:[]};notes.push(note);
+    const note={id:randomUUID(),content:body.content,state:body.state,archived:body.archived??false,tags:body.tags,attachments:[]};notes.push(note);
     if(failure==='lost-create'){failure='';res.writeHead(201,{'Content-Type':'application/json'});res.end('{');return;}
     reply(note,201);return;
   }

@@ -4,8 +4,9 @@ import { ApiFailure, type RoteAttachment, type UploadManifest } from '../src/rot
 import type { SaveTask } from '../src/domain/task';
 import { MissingHostPermission } from '../src/tasks/images';
 import { capture } from './fixtures';
+import { noteContent } from '../src/domain/capture';
 
-const settings = {addPlatformTag:false,defaultTags: [] as string[], defaultVisibility: 'private' as const,id:'account-a',apiUrl:'https://api.example.test',openKey:'11111111-1111-4111-8111-111111111111',theme:'system' as const,language:'en' as const};
+const settings = {defaultArchived:false,addPlatformTag:false,defaultTags: [] as string[], defaultVisibility: 'private' as const,id:'account-a',apiUrl:'https://api.example.test',openKey:'11111111-1111-4111-8111-111111111111',theme:'system' as const,language:'en' as const};
 function harness() {
   const tasks = new Map<string, SaveTask>();
   const blobs = new Map<string,Blob>();
@@ -107,10 +108,10 @@ describe('durable save workflow', () => {
 
 it('keeps capture-time defaults after settings change and uses private for legacy tasks', async () => {
   const h=harness();
-  const task=await h.runner.enqueue(capture(),{...settings,defaultTags:['阅读'],addPlatformTag:true,defaultVisibility:'public'});
+  const task=await h.runner.enqueue(capture(),{...settings,defaultTags:['阅读'],addPlatformTag:true,defaultVisibility:'public',defaultArchived:true});
   h.deps.settings=async()=>({...settings,defaultTags:['changed']});
   await h.runner.start(task.id);
-  expect(h.client.createNote).toHaveBeenCalledWith(task.capture,{tags:['阅读','X'],visibility:'public'});
+  expect(h.client.createNote).toHaveBeenCalledWith(task.capture,{tags:['阅读','X'],visibility:'public',archived:true});
   const legacy=await h.runner.enqueue(capture('456'),settings);
   delete legacy.noteDefaults; await h.deps.store.put(legacy);
   h.deps.settings=async()=>({...settings,defaultTags:['public'],defaultVisibility:'public'});
@@ -127,4 +128,19 @@ it('keeps platform task identities separate and deduplicates GitHub captures', a
   expect(a.id).toBe('account-a:github:owner/repo');
   expect(x.id).toBe('account-a:x:123');
   expect(a.id).toBe(b.id);expect(tasks.size).toBe(2);
+});
+
+it('reconciles an archived creation using capture-time defaults after settings change', async () => {
+  const h=harness();
+  h.client.createNote.mockRejectedValueOnce(new ApiFailure(0,true));
+  const task=await h.runner.enqueue(capture(),{...settings,defaultArchived:true});
+  await h.runner.start(task.id);
+  expect(h.tasks.get(task.id)?.status).toBe('uncertain');
+  h.deps.settings=async()=>({...settings,defaultArchived:false});
+  const noteId=crypto.randomUUID();
+  h.client.findNotes.mockResolvedValueOnce([{id:noteId,content:noteContent(task.capture)}]);
+  await new SaveRunner(h.deps).reconcile(task.id);
+  expect(h.client.findNotes).toHaveBeenCalledWith(task.capture.sourceUrl,true);
+  expect(h.tasks.get(task.id)).toMatchObject({status:'saved',noteId});
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
 });

@@ -15,6 +15,7 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
   const [defaultTags, setDefaultTags] = useState(settings?.defaultTags?.join(', ') ?? '');
   const [addPlatformTag, setAddPlatformTag] = useState(settings?.addPlatformTag ?? false);
   const [defaultVisibility, setDefaultVisibility] = useState<'private' | 'public'>(settings?.defaultVisibility ?? 'private');
+  const [defaultArchived, setDefaultArchived] = useState(settings?.defaultArchived ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -28,7 +29,7 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
     try {
       // Permission request starts directly in the user's click gesture, before any network await.
       if (!await chrome.permissions.request({ origins: [originPattern(normalized)] })) throw new Error('permissionsDenied');
-      const result = await send({ type: 'settings:save', settings: { apiUrl: normalized, openKey, language, theme, defaultTags: tags, addPlatformTag, defaultVisibility } });
+      const result = await send({ type: 'settings:save', settings: { apiUrl: normalized, openKey, language, theme, defaultTags: tags, addPlatformTag, defaultVisibility, defaultArchived } });
       if (result.settings) { onSaved(result.settings); setSaved(true); }
     } catch (error) { setError(error instanceof Error ? error.message : 'save_failed'); }
     finally { setBusy(false); }
@@ -45,6 +46,10 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
         <p className="hint" id="platform-tag-hint">{t('platformTagHint')}</p>
       </div>
       <div className="field"><label htmlFor="defaultVisibility">{t('defaultVisibility')}</label><select id="defaultVisibility" value={defaultVisibility} onChange={e => setDefaultVisibility(e.target.value as 'private' | 'public')} aria-describedby="visibility-hint"><option value="private">{t('visibilityPrivate')}</option><option value="public">{t('visibilityPublic')}</option></select><p className="hint" id="visibility-hint">{t(defaultVisibility === 'public' ? 'publicHint' : 'privateHint')}</p></div>
+      <div className="field">
+        <div className="platform-tag-toggle"><label htmlFor="defaultArchived">{t('defaultArchived')}</label><Switch id="defaultArchived" checked={defaultArchived} onCheckedChange={setDefaultArchived} aria-describedby="archive-hint" /></div>
+        <p className="hint" id="archive-hint">{t('archiveHint')}</p>
+      </div>
       <div className="preferences">
         <div className="field"><label htmlFor="language">{t('language')}</label><select id="language" value={language} onChange={e => setLanguage(e.target.value as SettingsInput['language'])}><option value="system">{t('system')}</option><option value="zh">简体中文</option><option value="en">English</option></select></div>
         <div className="field"><label htmlFor="theme">{t('theme')}</label><select id="theme" value={theme} onChange={e => setTheme(e.target.value as SettingsInput['theme'])}><option value="system">{t('system')}</option><option value="light">{t('light')}</option><option value="dark">{t('dark')}</option></select></div>

@@ -26,7 +26,7 @@ export class SaveRunner {
       const existing = await this.deps.store.get(id);
       if (existing) return existing;
       const now = new Date().toISOString();
-      const task: SaveTask = { id, configId: settings.id, capture, noteDefaults: { tags: captureTags(capture.site, settings, capture.sourceUrl), visibility: settings.defaultVisibility }, status: 'queued', createdAt: now, updatedAt: now, uploaded: [], batches: [], finalized: [] };
+      const task: SaveTask = { id, configId: settings.id, capture, noteDefaults: { tags: captureTags(capture.site, settings, capture.sourceUrl), visibility: settings.defaultVisibility, archived: settings.defaultArchived }, status: 'queued', createdAt: now, updatedAt: now, uploaded: [], batches: [], finalized: [] };
       await this.persist(task);
       return task;
     });
@@ -62,7 +62,7 @@ export class SaveRunner {
     const task = await this.deps.store.get(id);
     if (!settings || !task || task.configId !== settings.id || task.status !== 'uncertain') return;
     const client = this.deps.client(settings);
-    const notes = await client.findNotes(task.capture.sourceUrl);
+    const notes = await client.findNotes(task.capture.sourceUrl, task.noteDefaults?.archived ?? false);
     const exact = notes.filter(note => note.content === noteContent(task.capture));
     if (exact.length !== 1) return;
     task.noteId = exact[0]!.id;

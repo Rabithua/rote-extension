@@ -1,7 +1,7 @@
 import type { CaptureItem } from './capture';
 import type { UploadManifest } from '../rote/client';
 
-export interface NoteDefaults { tags: string[]; visibility: 'private' | 'public' }
+export interface NoteDefaults { tags: string[]; visibility: 'private' | 'public'; archived?: boolean }
 
 export type TaskStatus = 'queued' | 'creating' | 'uploading' | 'finalizing' | 'saved' | 'failed' | 'uncertain';
 export interface SaveTask {
