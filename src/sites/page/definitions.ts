@@ -27,9 +27,9 @@ export const bilibiliDefinition: PageDefinition = {
     // Early insertion makes Bilibili rebuild its app and mount the header twice.
     if (!share || share.closest('[data-server-rendered]')) return null;
     const element = button(label); element.dataset.rotePage = 'bilibili';
-    element.style.cssText = 'display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;white-space:nowrap;padding:8px 10px';
+    element.style.cssText = 'display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;font:inherit;white-space:nowrap;padding:8px 10px';
     element.querySelector('svg')!.setAttribute('width', '22'); element.querySelector('svg')!.setAttribute('height', '22');
-    const native = getComputedStyle(share); element.style.font = native.font; element.style.color = native.color; element.style.padding = native.padding;
+    const native = getComputedStyle(share); element.style.font = native.font; element.style.setProperty('--rote-bili-text', native.color); element.style.padding = native.padding;
     const anchor = share.closest('.toolbar-left-item-wrap') ?? share;
     const size = share.querySelector('svg')?.getBoundingClientRect();
     if (size?.width) { element.querySelector('svg')!.setAttribute('width', String(size.width)); element.querySelector('svg')!.setAttribute('height', String(size.height)); element.querySelector('svg')!.style.width = `${size.width}px`; element.querySelector('svg')!.style.height = `${size.height}px`; }

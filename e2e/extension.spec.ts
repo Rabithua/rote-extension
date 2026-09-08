@@ -549,3 +549,22 @@ test('Bilibili leaves server-rendered DOM intact until hydration completes',asyn
   await expect(button).toHaveCount(1);await expect(button).toBeEnabled();
   await expect(page.locator('#biliMainHeader a')).toBeVisible();
 });
+
+test('Bilibili button follows native hover colors and exposes focus and disabled states',async({context,extensionId})=>{
+  await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://www.bilibili.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><style>:root{--text2:rgb(97,102,109);--brand_blue:rgb(0,174,236)}body{padding:40px}.video-share{color:var(--text2);font:14px Arial;padding:8px;transition:color .3s}.video-share:hover{color:var(--brand_blue)}</style><div class="video-toolbar-left"><button class="video-share">Share</button></div></html>'}));
+  const page=await context.newPage();await page.goto('https://www.bilibili.com/video/BV1234567890');
+  const button=page.locator('[data-rote-page=bilibili]');const native=page.locator('.video-share');
+  await expect(button).toBeVisible();const box=(await button.boundingBox())!;
+  await native.hover();await expect(native).toHaveCSS('color','rgb(0, 174, 236)');
+  await button.hover();await expect(button).toHaveCSS('color','rgb(0, 174, 236)');
+  expect(await button.boundingBox()).toEqual(box);
+  await page.mouse.move(0,0);await expect(button).toHaveCSS('color','rgb(97, 102, 109)');
+  await native.focus();await page.keyboard.press('Tab');await expect(button).toBeFocused();
+  await expect(button).toHaveCSS('outline-style','solid');await expect(button).toHaveCSS('color','rgb(0, 174, 236)');
+  await button.click({position:{x:box.width-2,y:box.height-2}});await expect(button).toHaveText('Saved to Rote');
+  await button.hover();await expect(button).toHaveCSS('color','rgb(97, 102, 109)');
+  await expect(button).toHaveCSS('cursor','not-allowed');await expect(button).toHaveCSS('opacity','0.3');
+  await page.locator('html').evaluate(el=>{el.style.setProperty('--text2','rgb(200,200,200)');el.style.setProperty('--brand_blue','rgb(60,190,250)');});
+  await expect(button).toHaveCSS('color','rgb(200, 200, 200)');
+});
