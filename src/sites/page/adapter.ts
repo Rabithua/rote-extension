@@ -38,7 +38,7 @@ export class PageAdapter implements SiteAdapter {
 
   mount() {
     this.observer = new MutationObserver(this.schedule);
-    this.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'aria-labelledby', 'data-state'] });
+    this.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'aria-labelledby', 'data-state', 'data-server-rendered'] });
     document.addEventListener('rote:page-refresh', this.schedule);
     this.refresh();
   }
