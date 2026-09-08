@@ -139,15 +139,22 @@ test('persists default tags and visibility and keeps saved-note settings during 
   const settings=await connect(context,extensionId,'zh');
   await settings.locator('#defaultTags').fill('#X， 阅读, X');
   await settings.locator('#defaultVisibility').selectOption('public');
+  await settings.getByText('默认归档',{exact:true}).click();
   await settings.locator('button[type=submit]').click();
   await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await settings.reload();
   await expect(settings.locator('#defaultTags')).toHaveValue('X, 阅读');
   await expect(settings.locator('#defaultVisibility')).toHaveValue('public');
+  await expect(settings.locator('#defaultArchived')).toBeChecked();
+  await settings.locator('#defaultArchived').click({position:{x:1,y:1}});
+  await expect(settings.locator('#defaultArchived')).not.toBeChecked();
+  await settings.locator('#defaultArchived').press('Space');
+  await expect(settings.locator('#defaultArchived')).toBeChecked();
   const page=await openX(context);
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});
   await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
   await expect(settings.getByText('文字已保存，图片待补传',{exact:true})).toBeVisible();
+  await settings.locator('#defaultArchived').press('Space');
   await settings.locator('#defaultTags').fill('新标签');await settings.locator('#defaultVisibility').selectOption('private');
   await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await settings.getByRole('button',{name:'重试',exact:true}).click();await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
@@ -155,8 +162,8 @@ test('persists default tags and visibility and keeps saved-note settings during 
   await expect(settings.getByText('已保存到 Rote',{exact:true})).toHaveCount(2);
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(state.data.notes).toHaveLength(2);
-  expect(state.data.notes[0]).toMatchObject({state:'public',tags:['X','阅读']});
-  expect(state.data.notes[1]).toMatchObject({state:'private',tags:['新标签']});
+  expect(state.data.notes[0]).toMatchObject({state:'public',tags:['X','阅读'],archived:true});
+  expect(state.data.notes[1]).toMatchObject({state:'private',tags:['新标签'],archived:false});
 });
 test('renders legacy worker settings without crashing on missing tags',async({context,extensionId})=>{
   const page=await context.newPage();const errors:string[]=[];
@@ -196,12 +203,12 @@ test('persists the platform tag switch and applies it only to new captures',asyn
   await toggle.focus();await settings.keyboard.press('Space');await expect(toggle).toBeChecked();
   await settings.locator('#defaultTags').fill('阅读');await settings.locator('button[type=submit]').click();
   await expect(settings.locator('button[type=submit]')).toBeEnabled();await settings.reload();
-  await expect(settings.getByRole('switch')).toBeChecked();
+  await expect(settings.locator('#addPlatformTag')).toBeChecked();
   const page=await openX(context);
   await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
   await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
-  const box=await settings.getByRole('switch').boundingBox();if(!box)throw Error('Switch missing');
-  await settings.getByRole('switch').click({position:{x:box.width-4,y:box.height-4}});
+  const box=await settings.locator('#addPlatformTag').boundingBox();if(!box)throw Error('Switch missing');
+  await settings.locator('#addPlatformTag').click({position:{x:box.width-4,y:box.height-4}});
   await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
   await expect(settings.getByText('已保存到 Rote',{exact:true})).toHaveCount(2);
@@ -211,7 +218,7 @@ test('persists the platform tag switch and applies it only to new captures',asyn
 
 test('GitHub saves summary with tags, deduplicates and follows repository navigation',async({context,extensionId})=>{
   const settings=await connect(context,extensionId);
-  await settings.getByRole('switch').click();await settings.locator('button[type=submit]').click();
+  await settings.locator('#addPlatformTag').click();await settings.locator('button[type=submit]').click();
   await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubFixture(new URL(route.request().url()).pathname.slice(1),true,'A useful project')}));
   const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
@@ -351,7 +358,7 @@ test('X and GitHub share Rote toast styling, success dismissal and recovery cont
 });
 
 test('YouTube card menus and watch buttons share a video task with its cover',async({context,extensionId})=>{
-  const settings=await connect(context,extensionId);await settings.getByRole('switch').click();await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  const settings=await connect(context,extensionId);await settings.locator('#addPlatformTag').click();await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeFixture(new URL(route.request().url()).pathname==='/watch')}));
   const page=await context.newPage();await page.goto('https://www.youtube.com/');
   await page.getByRole('button',{name:'More actions'}).first().click();
@@ -444,7 +451,7 @@ async function invokeContextCapture(context:BrowserContext,url:string,selection?
   },{url,selection});
 }
 test('generic bookmarks and exact multiline selections deduplicate independently',async({context,extensionId})=>{
-  const settings=await connect(context,extensionId);await settings.getByRole('switch').click();await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
+  const settings=await connect(context,extensionId);await settings.locator('#addPlatformTag').click();await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await context.route('https://example.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><title>Reference</title><p>First paragraph</p><p>Second paragraph</p></html>'}));
   const page=await context.newPage();const url='https://example.com/a?q=1#section';await page.goto(url);
   await invokeContextCapture(context,url);await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(1);

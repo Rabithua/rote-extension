@@ -38,14 +38,14 @@ export class RoteClient {
     return z.object({ permissions: z.array(z.string()) }).parse(await this.call('/permissions', 'GET')).permissions;
   }
   async createNote(capture: CaptureItem, defaults: NoteDefaults = { tags: [], visibility: 'private' }): Promise<RoteNote> {
-    const data = await this.call('/notes', 'POST', { content: noteContent(capture), title: '', state: defaults.visibility, tags: defaults.tags, editor: 'normal', pin: false });
+    const data = await this.call('/notes', 'POST', { content: noteContent(capture), title: '', state: defaults.visibility, tags: defaults.tags, editor: 'normal', pin: false, archived: defaults.archived ?? false });
     const parsed = noteSchema.safeParse(data);
     if (!parsed.success) throw new ApiFailure(201, true);
     return parsed.data;
   }
   async getNote(id: string): Promise<RoteNote> { return noteSchema.parse(await this.call(`/notes/${encodeURIComponent(id)}`, 'GET')); }
-  async findNotes(sourceUrl: string): Promise<RoteNote[]> {
-    return z.array(noteSchema).parse(await this.call(`/notes/search?keyword=${encodeURIComponent(sourceUrl)}&limit=100`, 'GET'));
+  async findNotes(sourceUrl: string, archived = false): Promise<RoteNote[]> {
+    return z.array(noteSchema).parse(await this.call(`/notes/search?keyword=${encodeURIComponent(sourceUrl)}&limit=100&archived=${archived}`, 'GET'));
   }
   async presign(blobs: Blob[]): Promise<UploadManifest> {
     return manifestSchema.parse(await this.call('/attachments/presign', 'POST', { files: blobs.map((blob, index) => ({

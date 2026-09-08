@@ -16,7 +16,7 @@ describe('connection settings', () => {
 
 it('migrates existing settings to private with no tags and normalizes tag input', () => {
   const old = {apiUrl:'https://rote.ink',openKey:'11111111-1111-4111-8111-111111111111',theme:'system',language:'system'};
-  expect(settingsSchema.parse(old)).toMatchObject({defaultTags:[],defaultVisibility:'private'});
+  expect(settingsSchema.parse(old)).toMatchObject({defaultTags:[],defaultVisibility:'private',defaultArchived:false});
   expect(parseDefaultTags(' #X, 阅读，X, , #research notes ')).toEqual(['X','阅读','research notes']);
   expect(settingsSchema.safeParse({...old,defaultTags:['a'.repeat(51)]}).success).toBe(false);
   expect(settingsSchema.safeParse({...old,defaultTags:Array.from({length:21},(_,i)=>String(i))}).success).toBe(false);

@@ -37,3 +37,15 @@ it('sends explicitly selected public visibility and tags', async () => {
   await new RoteClient(config,request).createNote(capture(),{tags:['X','阅读'],visibility:'public'});
   expect(JSON.parse(request.mock.calls[0]![1]!.body as string)).toMatchObject({state:'public',tags:['X','阅读']});
 });
+
+it.each([true, false, undefined])('sends archive preference %s when creating a note', async archived => {
+  const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({data:{id:crypto.randomUUID(),content:'saved'}})));
+  await new RoteClient(config,request).createNote(capture(),{tags:[],visibility:'private',archived});
+  expect(JSON.parse(request.mock.calls[0]![1]!.body as string)).toMatchObject({archived:archived ?? false,state:'private'});
+});
+
+it('searches archived notes when reconciling an archived capture', async () => {
+  const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({data:[]})));
+  await new RoteClient(config,request).findNotes('https://example.com/',true);
+  expect(new URL(String(request.mock.calls[0]![0])).searchParams.get('archived')).toBe('true');
+});
