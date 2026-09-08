@@ -174,3 +174,9 @@ Lint, typecheck, 54 unit tests and all 38 Chromium scenarios passed before the f
 The previous content script inserted its toolbar button into Bilibili's server-rendered Vue tree before hydration. In the user's Dia video page this caused the native header to be mounted twice and disappear with a `nextSibling` error. The adapter now waits for the ancestor `data-server-rendered` marker to be removed and observes that attribute so it mounts after hydration, including after route/root replacement. It does not rebuild or restyle the native header.
 
 The new delayed-hydration Chromium regression failed against 0.4.5 (a button was inserted into the untouched server tree), then passed with the fix. Lint, typecheck, 54 unit tests, production build and all 39 Chromium scenarios passed. The installed unpacked extension was reloaded to 0.4.6 in Dia; refreshing the same real video restored the full header while retaining the Save to Rote button. Its console reported two warnings and no errors; the duplicate-mount and nextSibling errors were absent. No new note was created during this visual check. The pending store submission was not changed.
+
+## 0.4.7 Bilibili toolbar states
+
+Added scoped Bilibili button CSS using the host's `--text2` and `--brand_blue` variables: color hover transition, visible keyboard focus, and the native disabled cursor/opacity. Existing dimensions and the hydration guard are preserved. The CSS is registered only with the Bilibili content script and targets only the injected button.
+
+Lint, typecheck, 54 unit tests, production build and all five Bilibili Chromium scenarios passed. Coverage compares native and injected hover colors, unchanged bounds, pointer exit, keyboard focus, bottom-corner clicks, disabled hover and theme-variable changes. The generated manifest includes the scoped CSS. Dia still showed 0.4.6 during the attempted reload; live 0.4.7 interaction is not claimed.

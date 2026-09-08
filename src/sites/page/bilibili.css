@@ -1,0 +1,18 @@
+/* Match Bilibili's toolbar color states without styling host-owned elements. */
+[data-rote-page="bilibili"] {
+  color: var(--text2, var(--rote-bili-text));
+  cursor: pointer;
+  transition: color .3s;
+}
+[data-rote-page="bilibili"]:enabled:hover,
+[data-rote-page="bilibili"]:enabled:focus-visible {
+  color: var(--brand_blue, #00aeec);
+}
+[data-rote-page="bilibili"]:focus-visible {
+  outline: 2px solid var(--brand_blue, #00aeec);
+  outline-offset: 3px;
+}
+[data-rote-page="bilibili"]:disabled {
+  cursor: not-allowed;
+  opacity: .3;
+}
