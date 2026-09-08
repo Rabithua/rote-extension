@@ -339,6 +339,8 @@ test('X and GitHub share Rote toast styling, success dismissal and recovery cont
   const xToast=x.locator('[data-rote-toast]');await expect(xToast.getByRole('status')).toContainText('Saved to Rote');
   const visual=async(page:typeof x)=>page.locator('[data-rote-toast] .message').evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,color:s.color,padding:s.padding,border:s.border,radius:s.borderRadius,font:s.font};});
   const xStyle=await visual(x);
+  expect(xStyle.padding).toBe('6px 14px');expect(xStyle.radius).toBe('999px');
+  expect((await xToast.getByRole('status').boundingBox())!.height).toBeLessThan(44);
   await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubFixture()}));
   const github=await context.newPage();await github.emulateMedia({colorScheme:'dark'});await github.goto('https://github.com/Owner/Repo');
   await expect(github.locator('[data-rote-toast]')).toHaveCount(0);
@@ -354,7 +356,9 @@ test('X and GitHub share Rote toast styling, success dismissal and recovery cont
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'create403'}});
   await github.locator('[data-rote-github] button').click();await expect(toast.getByRole('button',{name:'Open settings'})).toBeVisible();
   await github.setViewportSize({width:360,height:600});expect(await github.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await toast.getByRole('button',{name:'Close',exact:true}).click({position:{x:2,y:2}});await expect(toast).toHaveCount(0);
+  await toast.locator('.message').evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
+  await github.screenshot({path:'test-results/visuals/toast-recovery-narrow.png'});
+  await toast.getByRole('button',{name:'Close',exact:true}).click({position:{x:2,y:2}});await expect(toast).toHaveAttribute('data-closing','');await expect(toast).toHaveCount(0);
 });
 
 test('YouTube card menus and watch buttons share a video task with its cover',async({context,extensionId})=>{
@@ -567,4 +571,45 @@ test('Bilibili button follows native hover colors and exposes focus and disabled
   await expect(button).toHaveCSS('cursor','not-allowed');await expect(button).toHaveCSS('opacity','0.3');
   await page.locator('html').evaluate(el=>{el.style.setProperty('--text2','rgb(200,200,200)');el.style.setProperty('--brand_blue','rgb(60,190,250)');});
   await expect(button).toHaveCSS('color','rgb(200, 200, 200)');
+});
+
+
+test('toast motion respects reduced motion and stays compact in light theme',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  const page=await openX(context);await page.emulateMedia({colorScheme:'light',reducedMotion:'reduce'});
+  await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
+  const toast=page.locator('[data-rote-toast]');await expect(toast.getByRole('status')).toContainText('Saved to Rote');
+  const message=toast.locator('.message');await expect(message).toHaveCSS('transition-duration','0s');
+  await expect(message).toHaveCSS('transform','none');
+  await page.screenshot({path:'test-results/visuals/toast-pill-light.png'});
+  const close=toast.getByRole('button',{name:'Close',exact:true});const box=(await close.boundingBox())!;
+  await close.click({position:{x:box.width-3,y:box.height-3}});await expect(toast).toHaveCount(0);
+});
+
+test('toast enters with a slight spring and animates out',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  const page=await openX(context);
+  await page.evaluate(()=>{
+    new MutationObserver(()=>{
+      const message=document.querySelector('[data-rote-toast]')?.shadowRoot?.querySelector('.message');
+      if(!message||message.hasAttribute('data-motion-checked'))return;
+      message.setAttribute('data-motion-checked','');
+      requestAnimationFrame(()=>{
+        const motions=message.getAnimations();
+        motions.forEach(a=>a.updatePlaybackRate(.1));
+        message.setAttribute('data-motion-count',String(motions.length));
+      });
+    }).observe(document.body,{childList:true});
+  });
+  await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
+  const toast=page.locator('[data-rote-toast]');const message=toast.locator('.message');
+  await expect(message).toHaveAttribute('data-motion-count','2');
+  await page.waitForTimeout(1000);
+  await page.screenshot({path:'test-results/visuals/toast-motion-slow.png'});
+  await message.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
+  await expect(message).toHaveCSS('opacity','1');
+  await toast.getByRole('button',{name:'Close',exact:true}).click();
+  await expect(toast).toHaveAttribute('data-closing','');
+  expect(await message.evaluate(el=>el.getAnimations().length)).toBeGreaterThan(0);
+  await expect(toast).toHaveCount(0);
 });

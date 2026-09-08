@@ -180,3 +180,9 @@ The new delayed-hydration Chromium regression failed against 0.4.5 (a button was
 Added scoped Bilibili button CSS using the host's `--text2` and `--brand_blue` variables: color hover transition, visible keyboard focus, and the native disabled cursor/opacity. Existing dimensions and the hydration guard are preserved. The CSS is registered only with the Bilibili content script and targets only the injected button.
 
 Lint, typecheck, 54 unit tests, production build and all five Bilibili Chromium scenarios passed. Coverage compares native and injected hover colors, unchanged bounds, pointer exit, keyboard focus, bottom-corner clicks, disabled hover and theme-variable changes. The generated manifest includes the scoped CSS. Dia still showed 0.4.6 during the attempted reload; live 0.4.7 interaction is not claimed.
+
+## 0.4.8 Compact capsule toast
+
+Shared Shadow DOM feedback now uses 6px vertical and 14px horizontal padding, a capsule radius and a subtle spring entrance (360ms transform, 180ms fade). Exit fades and shifts down before removal. Status changes update in place, a new capture can interrupt an exit, and reduced-motion mode skips transitions. Host-page styles remain isolated.
+
+Lint, typecheck, 57 unit tests and the production build passed. The browser suite passed its existing 40 scenarios; the new reduced-motion corner test initially clicked outside the circular close surface, then passed after targeting its visible edge. All three targeted toast scenarios passed, including a second new entrance/exit test (42 distinct browser scenarios covered in total). Light/dark, compact success, narrow recovery and a 10%-speed entrance screenshot were inspected. This validation uses Chromium fixtures; no live note or Chrome Web Store submission was made for this change.
