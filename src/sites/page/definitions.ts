@@ -23,7 +23,9 @@ export const bilibiliDefinition: PageDefinition = {
   site: 'bilibili', sourceId: bilibiliVideoId, extract: async () => { const url = location.href; try { return (await send({ type: 'page:extract', site: 'bilibili', url })).capture as Awaited<ReturnType<typeof extractBilibili>>; } catch { return location.href === url ? extractBilibili() : null; } },
   mountButton(label) {
     const share = document.querySelector<HTMLElement>('.video-toolbar-left .video-share, .video-toolbar-left-main .video-share');
-    if (!share) return null;
+    // Vue must hydrate the original server-rendered tree before we add siblings.
+    // Early insertion makes Bilibili rebuild its app and mount the header twice.
+    if (!share || share.closest('[data-server-rendered]')) return null;
     const element = button(label); element.dataset.rotePage = 'bilibili';
     element.style.cssText = 'display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;white-space:nowrap;padding:8px 10px';
     element.querySelector('svg')!.setAttribute('width', '22'); element.querySelector('svg')!.setAttribute('height', '22');

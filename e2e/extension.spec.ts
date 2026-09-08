@@ -527,3 +527,25 @@ test('old published text cache does not block new settings or get cleared', asyn
   await expect(page.getByRole('status').filter({hasText:'Connected'})).toBeVisible();
   expect(await page.evaluate(async () => (await chrome.storage.local.get('content')).content)).toEqual(['unsaved old text\n']);
 });
+
+test('Bilibili leaves server-rendered DOM intact until hydration completes',async({context,extensionId})=>{
+  await connect(context,extensionId);await mockPageAPIs(context);
+  await context.route('https://www.bilibili.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><body><div id="app" data-server-rendered="true"><header id="biliMainHeader"><a href="/">Home</a></header><div class="video-toolbar-left"><button class="video-share">Share</button></div></div></body></html>'}));
+  const page=await context.newPage();await page.goto('https://www.bilibili.com/video/BV1234567890');
+  // Allow content-script startup and observer frames while the host JS is delayed.
+  await page.waitForTimeout(500);
+  await expect(page.locator('[data-rote-page]')).toHaveCount(0);
+  await expect(page.locator('.video-toolbar-left')).toHaveText('Share');
+  await page.locator('#app').evaluate(el=>el.removeAttribute('data-server-rendered'));
+  const button=page.locator('[data-rote-page=bilibili]');await expect(button).toHaveCount(1);
+  await expect(page.locator('#biliMainHeader a')).toBeVisible();
+  await button.click();await expect(button).toHaveText('Saved to Rote');
+  await page.evaluate(()=>{
+    history.pushState({},'', '/video/BV1234567891');
+    document.querySelector('#app')!.outerHTML='<div id="app" data-server-rendered="true"><header id="biliMainHeader"><a href="/">Home</a></header><div class="video-toolbar-left"><button class="video-share">Share</button></div></div>';
+  });
+  await page.waitForTimeout(200);await expect(button).toHaveCount(0);
+  await page.locator('#app').evaluate(el=>el.removeAttribute('data-server-rendered'));
+  await expect(button).toHaveCount(1);await expect(button).toBeEnabled();
+  await expect(page.locator('#biliMainHeader a')).toBeVisible();
+});
