@@ -1,0 +1,27 @@
+// Real Rote and extension components, rendered with isolated, non-personal demo data.
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {BrowserRouter} from '@rote-web/../node_modules/react-router-dom';
+import {TooltipProvider} from '@rote-web/components/ui/tooltip';
+import RoteItem from '@rote-web/components/rote/roteItem';
+import '@rote-web/utils/i18n';
+import i18n from '@rote-web/../node_modules/i18next';
+import {ConnectionForm} from '@extension/ui/ConnectionForm';
+import {TaskList} from '@extension/ui/TaskList';
+import {translate} from '@extension/locales/messages';
+import {CaptureToast} from '@extension/sites/toast';
+import {noteContent} from '@extension/domain/capture';
+const params=new URLSearchParams(location.search),lang=params.get('lang')==='en'?'en':'zh',kind=params.get('kind')||'note';
+if (!i18n.isInitialized) await new Promise<void>(resolve=>i18n.on('initialized',()=>resolve()));
+await i18n.changeLanguage(lang);
+const css=document.createElement('link');css.rel='stylesheet';css.href=kind==='settings'?'/extension.css':'/rote-web.css';document.head.append(css);
+const cn=lang==='zh';
+const content=noteContent({site:'github',sourceId:'octocat/hello-world',sourceUrl:'https://github.com/octocat/Hello-World',repository:'octocat/Hello-World',text:'My first repository on GitHub!',images:[],complete:true,capturedAt:new Date().toISOString()});
+const passage=cn?'好的记录，是给未来的自己留一条线索。\n不必写很多，留住真正有用的一段就好。':'A good note leaves a trail for your future self.\nKeep the part that matters.';
+const note={id:'demo-project',title:'',content:kind==='selection'?(cn?'给未来的自己留一条线索':'A trail for your future self')+'\n\n'+passage+'\n\nhttps://rote.ink':kind==='image'?(cn?'把今天的小发现，留给以后的自己。':'A small discovery, saved for later.')+'\n\nhttps://rote.ink':content,state:'private',archived:false,pin:false,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),author:{nickname:cn?'我的收藏':'My collection',username:'demo',avatar:''},attachments:kind==='image'?[{id:'demo-image',url:'/__demo/woodland.png',compressUrl:'/__demo/woodland.png',sortIndex:0,details:{mediaKind:'image',mimetype:'image/png',width:960,height:600}}]:[],reactions:[],tags:[cn?'收藏':'Saved']};
+const settings={id:'demo',apiUrl:'https://api.rote.ink',openKey:'',language:lang,theme:'light',defaultTags:[cn?'收藏':'Saved'],addPlatformTag:true,defaultVisibility:'private',defaultArchived:true};
+const tasks=[['github','Rabithua/Rote','A personal note repository that looks different 🤔',0],['web',cn?'给未来的自己留一条线索':'A trail for your future self',passage,0],['x',cn?'今天的小发现':'A small discovery',cn?'把有用的文字和图片，一起留下。':'Keep useful words and images together.',1]].map(([site,author,excerpt,imageCount],i)=>({id:'demo-'+i,site,sourceId:'demo-'+i,sourceUrl:'https://rote.ink',author,excerpt,imageCount,uploadedCount:imageCount,status:'saved',updatedAt:new Date(Date.now()-i*60000).toISOString()}));
+const t=(key:string)=>translate(lang,key);
+createRoot(document.getElementById('root')!).render(kind==='settings'?<div style={{width:1030,padding:30,display:'grid',gridTemplateColumns:'410px 1fr',gap:60}}><div id="settings-demo"><ConnectionForm settings={settings as never} onSaved={()=>{}} t={t}/></div><div id="tasks-demo"><TaskList tasks={tasks as never} reload={async()=>{}} t={t}/></div></div>:<BrowserRouter><TooltipProvider><div id="note-demo" style={{width:470,padding:12}}><RoteItem rote={note as never} enableContentCollapse={false} showReactions={true}/></div></TooltipProvider></BrowserRouter>);
+
+if(kind==='toast'){document.documentElement.style.background='transparent';document.body.style.background='transparent';document.getElementById('root')!.style.display='none';new CaptureToast(t,async()=>{}).show('saved');}
