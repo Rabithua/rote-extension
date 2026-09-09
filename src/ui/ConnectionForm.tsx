@@ -1,3 +1,4 @@
+import { MorphText } from './MorphText';
 import { useState, type FormEvent } from 'react';
 import { Check } from 'lucide-react';
 import { Button } from './button';
@@ -54,7 +55,7 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
         <div className="field"><label htmlFor="language">{t('language')}</label><select id="language" value={language} onChange={e => setLanguage(e.target.value as SettingsInput['language'])}><option value="system">{t('system')}</option><option value="zh">简体中文</option><option value="en">English</option></select></div>
         <div className="field"><label htmlFor="theme">{t('theme')}</label><select id="theme" value={theme} onChange={e => setTheme(e.target.value as SettingsInput['theme'])}><option value="system">{t('system')}</option><option value="light">{t('light')}</option><option value="dark">{t('dark')}</option></select></div>
       </div>
-      <div className="actions">{saved || settings ? <span className="status" role="status"><Check size={14} />{t('connected')}</span> : null}<Button type="submit" disabled={busy}>{t(busy ? 'connecting' : settings ? 'saveSettings' : 'connect')}</Button></div>
+      <div className="actions">{saved || settings ? <span className="status" role="status"><Check size={14} />{t('connected')}</span> : null}<Button type="submit" disabled={busy}><MorphText>{t(busy ? 'connecting' : settings ? 'saveSettings' : 'connect')}</MorphText></Button></div>
       {error ? <p className="feedback error" role="alert">{t(error)}</p> : null}
     </form>
   </section>;
