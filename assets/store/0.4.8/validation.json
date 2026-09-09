@@ -1,0 +1,206 @@
+{
+  "version": "0.4.8",
+  "images": [
+    {
+      "file": "zh-CN/01-keep-what-matters.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 12069
+    },
+    {
+      "file": "zh-CN/02-see-it-save-it.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 9742
+    },
+    {
+      "file": "zh-CN/03-keep-this-passage.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 12587
+    },
+    {
+      "file": "zh-CN/04-words-and-images.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 11743
+    },
+    {
+      "file": "zh-CN/05-save-it-your-way.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 8866
+    },
+    {
+      "file": "en/01-keep-what-matters.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 13871
+    },
+    {
+      "file": "en/02-see-it-save-it.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 9672
+    },
+    {
+      "file": "en/03-keep-this-passage.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 21417
+    },
+    {
+      "file": "en/04-words-and-images.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 9014
+    },
+    {
+      "file": "en/05-save-it-your-way.png",
+      "width": 1280,
+      "height": 800,
+      "colorType": 2,
+      "exactBrandPixels": 12300
+    },
+    {
+      "file": "promo/marquee.png",
+      "width": 1400,
+      "height": 560,
+      "colorType": 2,
+      "exactBrandPixels": 4536
+    },
+    {
+      "file": "promo/small.png",
+      "width": 440,
+      "height": 280,
+      "colorType": 2,
+      "exactBrandPixels": 1681
+    }
+  ],
+  "shortDescriptionLengths": {
+    "zh-CN": 49,
+    "en": 125
+  },
+  "layout": [
+    {
+      "lang": "zh",
+      "slide": 1,
+      "title": "留住值得记下的发现",
+      "green": "rgb(62, 207, 74)",
+      "right": 966,
+      "bottom": 226.828125,
+      "subtitleTop": 234,
+      "subtitleRight": 526.203125,
+      "subtitleSize": "36px"
+    },
+    {
+      "lang": "zh",
+      "slide": 2,
+      "title": "看到，保存。",
+      "green": "rgb(62, 207, 74)",
+      "right": 660,
+      "bottom": 226.828125,
+      "subtitleTop": 234,
+      "subtitleRight": 545.8125,
+      "subtitleSize": "36px"
+    },
+    {
+      "lang": "zh",
+      "slide": 3,
+      "title": "留下这一段",
+      "green": "rgb(62, 207, 74)",
+      "right": 558,
+      "bottom": 226.828125,
+      "subtitleTop": 234,
+      "subtitleRight": 686.609375,
+      "subtitleSize": "36px"
+    },
+    {
+      "lang": "zh",
+      "slide": 4,
+      "title": "文字与图片，一起留下",
+      "green": "rgb(62, 207, 74)",
+      "right": 868,
+      "bottom": 204.4375,
+      "subtitleTop": 234,
+      "subtitleRight": 686.609375,
+      "subtitleSize": "36px"
+    },
+    {
+      "lang": "zh",
+      "slide": 5,
+      "title": "按你的习惯收好",
+      "green": "rgb(62, 207, 74)",
+      "right": 762,
+      "bottom": 226.828125,
+      "subtitleTop": 234,
+      "subtitleRight": 583.40625,
+      "subtitleSize": "32px"
+    },
+    {
+      "lang": "en",
+      "slide": 1,
+      "title": "Keep what matters.",
+      "green": "rgb(62, 207, 74)",
+      "right": 902.453125,
+      "bottom": 222.359375,
+      "subtitleTop": 234,
+      "subtitleRight": 694.390625,
+      "subtitleSize": "32px"
+    },
+    {
+      "lang": "en",
+      "slide": 2,
+      "title": "See it. Save it.",
+      "green": "rgb(62, 207, 74)",
+      "right": 660.75,
+      "bottom": 222.359375,
+      "subtitleTop": 234,
+      "subtitleRight": 615.421875,
+      "subtitleSize": "32px"
+    },
+    {
+      "lang": "en",
+      "slide": 3,
+      "title": "Keep this passage.",
+      "green": "rgb(62, 207, 74)",
+      "right": 891.09375,
+      "bottom": 222.359375,
+      "subtitleTop": 234,
+      "subtitleRight": 640.125,
+      "subtitleSize": "32px"
+    },
+    {
+      "lang": "en",
+      "slide": 4,
+      "title": "Keep words and images together.",
+      "green": "rgb(62, 207, 74)",
+      "right": 1120.125,
+      "bottom": 205,
+      "subtitleTop": 234,
+      "subtitleRight": 800.734375,
+      "subtitleSize": "32px"
+    },
+    {
+      "lang": "en",
+      "slide": 5,
+      "title": "Save it your way.",
+      "green": "rgb(62, 207, 74)",
+      "right": 791.1875,
+      "bottom": 222.359375,
+      "subtitleTop": 234,
+      "subtitleRight": 676.21875,
+      "subtitleSize": "32px"
+    }
+  ],
+  "notes": "Function illustrations are intentional; component screenshots use isolated demo data. No live store changes."
+}

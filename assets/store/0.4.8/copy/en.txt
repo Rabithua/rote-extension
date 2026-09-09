@@ -1,0 +1,16 @@
+Keep useful things you find online in your Rote notes.
+
+Save a discovery in one click
+On supported pages, click Save to Rote to capture the main content, its source link and available images. Keep browsing while your note is saved.
+
+Save a page, or just a passage
+Right-click to save a page's title and link. Select text first to keep the exact passage, including line breaks. Every note retains its source so you can return to the original page.
+
+Save it your way
+Choose default tags, visibility and archive settings for new captures. Notes are private by default, with a public option available. Check progress in Recent captures and resume interrupted image uploads without creating the note again.
+
+Get started
+You need a Rote account and an OpenKey with permission to create notes, read notes and upload attachments. Click the extension icon and enter your service address and OpenKey to connect to the official Rote service or a compatible self-hosted instance.
+
+Capture what you choose
+Captured content is sent only to your configured service. Credentials and recovery tasks stay in your browser. The extension does not download video files, PDFs or complete comment threads. Ordinary webpage bookmarks save the title and link, not the full article.
