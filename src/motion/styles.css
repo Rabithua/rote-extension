@@ -1,0 +1,14 @@
+.rote-morph { position:relative; display:inline-block; min-width:0; max-width:100%; vertical-align:bottom; }
+.rote-morph-label { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.rote-morph-visual { position:relative; display:block; width:max-content; max-width:100%; overflow-wrap:anywhere; }
+.rote-morph-visual > span { display:inline-block; white-space:pre-wrap; max-width:100%; vertical-align:top; }
+.rote-state-icon { position:relative; display:inline-block; width:16px; height:16px; flex:none; }
+.rote-state-icon > span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; opacity:0; scale:.25; filter:blur(4px); transition:opacity 280ms cubic-bezier(.2,0,0,1),scale 280ms cubic-bezier(.2,0,0,1),filter 280ms cubic-bezier(.2,0,0,1); }
+.rote-state-icon > [data-active=true] { opacity:1; scale:1; filter:blur(0); }
+.rote-spinner { box-sizing:border-box; width:14px; height:14px; border:1.5px solid currentColor; border-right-color:transparent; border-radius:50%; animation:rote-spin 900ms linear infinite; }
+.rote-state-icon > [data-active=false] .rote-spinner { animation-play-state:paused; }
+@keyframes rote-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) {
+  .rote-state-icon > span { transition:none; scale:1; filter:none; }
+  .rote-spinner { animation:none; }
+}

@@ -50,7 +50,7 @@ test('saves all images from the correct post, deduplicates and preserves menu st
   await expect(page.getByRole('menu')).toHaveCount(0);
   await expect(page.locator('[data-testid=mask]')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Share post'}).first()).toBeFocused();
-  await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   const result=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(result.data.notes).toHaveLength(1);expect(result.data.notes[0].state).toBe('private');expect(result.data.notes[0].attachments).toHaveLength(2);
   expect(result.data.notes[0].content).toContain('/status/1001');
@@ -79,7 +79,7 @@ test('handles keyboard focus, repeated menu mounts, Chinese and dark theme',asyn
   await page.keyboard.press('End');await expect(page.locator('[data-rote-capture]')).toBeFocused();
   await mkdir('test-results/visuals',{recursive:true});
   await page.screenshot({path:'test-results/visuals/x-menu-dark-zh.png'});
-  await page.keyboard.press('Enter');await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
+  await page.keyboard.press('Enter');await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^已保存到 Rote$/})).toBeVisible();
   await settings.screenshot({path:'test-results/visuals/settings-dark-zh.png',fullPage:true});
 });
 test('refuses collapsed posts and does not leak settings to a content script',async({context,extensionId})=>{
@@ -93,8 +93,8 @@ test('recovers an upload failure into the same note',async({context,extensionId}
   const settings=await connect(context,extensionId);const page=await openX(context);
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});
   await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
-  await expect(settings.getByText('Text saved. Images need attention.',{exact:true})).toBeVisible();
-  await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Text saved\. Images need attention\.$/})).toBeVisible();
+  await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(2);
 });
 test('a lost create response is reconciled without a duplicate',async({context,extensionId})=>{
@@ -102,7 +102,7 @@ test('a lost create response is reconciled without a duplicate',async({context,e
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'lost-create'}});
   await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
   await expect(settings.getByText('Check save result',{exact:true})).toBeVisible();
-  await settings.getByRole('button',{name:'Check in Rote',exact:true}).click();await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await settings.getByRole('button',{name:'Check in Rote',exact:true}).click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);
 });
 test('resumes persisted images after the service worker stops',async({context,extensionId})=>{
@@ -113,7 +113,7 @@ test('resumes persisted images after the service worker stops',async({context,ex
   await expect.poll(async()=>{const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();return state.data.failure;}).toBe('upload-pending');
   const cdp=await context.newCDPSession(settings);await cdp.send('ServiceWorker.enable');await cdp.send('ServiceWorker.stopAllWorkers');
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:''}});
-  await settings.reload();await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible({timeout:30000});
+  await settings.reload();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible({timeout:30000});
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(2);
 });
 test('supports corner clicks across routes, narrow layout and zoom, and rejects recycled targets',async({context,extensionId})=>{
@@ -153,13 +153,13 @@ test('persists default tags and visibility and keeps saved-note settings during 
   const page=await openX(context);
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});
   await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
-  await expect(settings.getByText('文字已保存，图片待补传',{exact:true})).toBeVisible();
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^文字已保存，图片待补传$/})).toBeVisible();
   await settings.locator('#defaultArchived').press('Space');
   await settings.locator('#defaultTags').fill('新标签');await settings.locator('#defaultVisibility').selectOption('private');
   await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
-  await settings.getByRole('button',{name:'重试',exact:true}).click();await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
+  await settings.getByRole('button',{name:'重试',exact:true}).click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^已保存到 Rote$/})).toBeVisible();
   await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
-  await expect(settings.getByText('已保存到 Rote',{exact:true})).toHaveCount(2);
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^已保存到 Rote$/})).toHaveCount(2);
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(state.data.notes).toHaveLength(2);
   expect(state.data.notes[0]).toMatchObject({state:'public',tags:['X','阅读'],archived:true});
@@ -206,12 +206,12 @@ test('persists the platform tag switch and applies it only to new captures',asyn
   await expect(settings.locator('#addPlatformTag')).toBeChecked();
   const page=await openX(context);
   await page.getByRole('button',{name:'Share post'}).nth(1).click();await page.locator('[data-rote-capture]').click();
-  await expect(settings.getByText('已保存到 Rote',{exact:true})).toBeVisible();
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^已保存到 Rote$/})).toBeVisible();
   const box=await settings.locator('#addPlatformTag').boundingBox();if(!box)throw Error('Switch missing');
   await settings.locator('#addPlatformTag').click({position:{x:box.width-4,y:box.height-4}});
   await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
-  await expect(settings.getByText('已保存到 Rote',{exact:true})).toHaveCount(2);
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^已保存到 Rote$/})).toHaveCount(2);
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(state.data.notes[0].tags).toEqual(['阅读','X']);expect(state.data.notes[1].tags).toEqual(['阅读']);
 });
@@ -368,16 +368,16 @@ test('YouTube card menus and watch buttons share a video task with its cover',as
   await page.getByRole('button',{name:'More actions'}).first().click();
   const row=page.locator('[data-rote-youtube=menu]');await expect(row).toHaveText('Save to Rote');
   await page.keyboard.press('End');await expect(row).toBeFocused();await page.keyboard.press('Enter');
-  await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);expect(state.data.notes[0].tags).toEqual(['YouTube']);expect(state.data.notes[0].content).toBe('Full video title\n\nhttps://www.youtube.com/watch?v=abcdefghijk');
   await page.goto('https://www.youtube.com/watch?v=abcdefghijk');const button=page.locator('[data-rote-youtube=watch]');await expect(button).toHaveText('Saved to Rote');await expect(button).toBeDisabled();
   await expect(settings.getByRole('link',{name:'Open video'})).toBeVisible();
-  await page.getByRole('button',{name:'More actions'}).nth(1).click();await expect(row).toHaveText('Save to Rote');await row.click({position:{x:3,y:3}});await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(2);
+  await page.getByRole('button',{name:'More actions'}).nth(1).click();await expect(row).toHaveText('Save to Rote');await row.click({position:{x:3,y:3}});await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toHaveCount(2);
 });
 test('YouTube watch captures survive cover upload failures and SPA navigation rejects stale metadata',async({context,extensionId})=>{
   const settings=await connect(context,extensionId);await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeFixture(true)}));
   const page=await context.newPage();await page.goto('https://www.youtube.com/watch?v=abcdefghijk');const button=page.locator('[data-rote-youtube=watch]');await expect(button).toBeVisible();
-  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});await button.click();await expect(settings.getByText('Text saved. Images need attention.',{exact:true})).toBeVisible();
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});await button.click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Text saved\. Images need attention\.$/})).toBeVisible();
   await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(button).toHaveText('Saved to Rote');
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
   await page.evaluate(()=>{document.dispatchEvent(new Event('yt-navigate-start'));history.pushState({},'', '/watch?v=lmnopqrstuv');document.dispatchEvent(new Event('yt-navigate-finish'));});await expect(button).toHaveCount(0);
@@ -424,7 +424,7 @@ test('Bilibili enters video through SPA, saves cover once and rebuilds button',a
   const page=await context.newPage();await page.goto('https://www.bilibili.com/');await page.evaluate(()=>{(window as unknown as {video:()=>void}).video();});
   const button=page.locator('[data-rote-page=bilibili]');await expect(button).toHaveCount(1);await button.click({position:{x:2,y:2}});
   await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Saved to Rote');
-  await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();await expect(button).toBeDisabled();
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();await expect(button).toBeDisabled();
   await page.evaluate(()=>{(window as unknown as {video:()=>void}).video();});await expect(button).toHaveCount(1);await expect(button).toBeDisabled();
   const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
 });
@@ -432,17 +432,17 @@ test('HN and arXiv place controls and save main content without comments or PDF'
   const settings=await connect(context,extensionId);
   await context.route('https://news.ycombinator.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><div class="athing"><span class="titleline"><a href="https://example.com/article">Article</a></span></div><span class="subtext"><span class="subline"><a class="hnuser">author</a> | comments</span></span><div class="toptext">Main text</div><div class="comment">Excluded comment</div></html>'}));
   const page=await context.newPage();await page.goto('https://news.ycombinator.com/item?id=123');await page.locator('[data-rote-page=hackernews] button').click({position:{x:1,y:1}});
-  await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   await context.route('https://arxiv.org/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><head><meta name="citation_title" content="Paper"><meta name="citation_author" content="Author"></head><body><blockquote class="abstract">Abstract: Full abstract</blockquote><div class="full-text"><ul><li><a>PDF</a></li></ul></div></body></html>'}));
   await page.goto('https://arxiv.org/abs/2401.12345v2');await expect(page.locator('.full-text > [data-rote-page=arxiv]')).toHaveCount(1);await page.locator('[data-rote-page=arxiv] button').click({position:{x:2,y:2}});
-  await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(2);
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toHaveCount(2);
   const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes[0].content).toContain('https://example.com/article');expect(state.data.notes[0].content).not.toContain('Excluded comment');expect(state.data.notes[1].content).toContain('Full abstract');
 });
 test('Bluesky menu closes and full post plus all images are saved',async({context,extensionId})=>{
   const settings=await connect(context,extensionId);await mockPageAPIs(context);
   await context.route('https://bsky.app/**',r=>r.fulfill({contentType:'text/html',body:`<html lang="en"><body><div data-testid="postThreadItem-by-user.test"><a href="/profile/user.test/post/123">Time</a><button data-testid="postDropdownBtn">More</button></div><script>document.querySelector('button').onclick=()=>{const m=document.createElement('div');m.setAttribute('role','menu');const b=document.createElement('button');b.setAttribute('role','menuitem');b.style.cssText='height:40px;padding:8px';b.textContent='Copy link';m.append(b);document.body.append(m)};document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelector('[role=menu]')?.remove()})</script></body></html>`}));
   const page=await context.newPage();await page.goto('https://bsky.app/profile/user.test/post/123');await page.getByRole('button',{name:'More'}).click();const button=page.locator('[data-rote-page=bluesky]');await expect(button).toHaveCount(1);await button.click({position:{x:2,y:2}});
-  await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await expect(page.getByRole('menu')).toHaveCount(0);await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   await expect(page.locator('[data-rote-toast]')).toBeVisible();await page.getByRole('button',{name:'More'}).click();await expect(button).toBeDisabled();
   const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(2);expect(state.data.notes[0].content).toBe('Full post\nSecond paragraph\n\nhttps://bsky.app/profile/did:plc:fixture/post/123');
 });
@@ -458,11 +458,11 @@ test('generic bookmarks and exact multiline selections deduplicate independently
   const settings=await connect(context,extensionId);await settings.locator('#addPlatformTag').click();await settings.locator('button[type=submit]').click();await expect(settings.locator('button[type=submit]')).toBeEnabled();
   await context.route('https://example.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><title>Reference</title><p>First paragraph</p><p>Second paragraph</p></html>'}));
   const page=await context.newPage();const url='https://example.com/a?q=1#section';await page.goto(url);
-  await invokeContextCapture(context,url);await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(1);
+  await invokeContextCapture(context,url);await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toHaveCount(1);
   await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Saved to Rote');
   await invokeContextCapture(context,url);await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Saved to Rote');
-  await invokeContextCapture(context,url,'First\n\nSecond');await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(2);
-  await invokeContextCapture(context,url,'Other');await expect(settings.getByText('Saved to Rote',{exact:true})).toHaveCount(3);
+  await invokeContextCapture(context,url,'First\n\nSecond');await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toHaveCount(2);
+  await invokeContextCapture(context,url,'Other');await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toHaveCount(3);
   const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(3);expect(state.data.notes[1].content).toBe('Reference\n\nFirst\n\nSecond\n\n'+url);expect(state.data.notes[0].tags).toContain('example.com');
 });
 test('generic capture guides setup',async({context,extensionId})=>{
@@ -483,12 +483,12 @@ test('Bilibili cover task survives page close and worker restart using persisted
   await context.route('https://www.bilibili.com/**',r=>r.fulfill({contentType:'text/html',body:'<html lang="en"><div class="video-toolbar-left"><button class="video-share">Share</button></div></html>'}));
   const page=await context.newPage();await page.goto('https://www.bilibili.com/video/BV1234567890');await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'hang-upload'}});await page.locator('[data-rote-page]').click();
   await expect.poll(async()=> (await(await context.request.get('http://127.0.0.1:43119/__state')).json()).data.failure).toBe('upload-pending');await page.close();
-  const cdp=await context.newCDPSession(settings);await cdp.send('ServiceWorker.enable');await cdp.send('ServiceWorker.stopAllWorkers');await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:''}});await settings.reload();await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible({timeout:30000});
+  const cdp=await context.newCDPSession(settings);await cdp.send('ServiceWorker.enable');await cdp.send('ServiceWorker.stopAllWorkers');await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:''}});await settings.reload();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible({timeout:30000});
   const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
 });
 test('generic creation failure recovers after source closes without duplicate notes',async({context,extensionId})=>{
   const settings=await connect(context,extensionId);await context.route('https://example.com/**',r=>r.fulfill({contentType:'text/html',body:'<title>Reference</title><p>Text</p>'}));const page=await context.newPage();await page.goto('https://example.com/');
-  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'create403'}});await invokeContextCapture(context,'https://example.com/');await expect(settings.getByRole('button',{name:'Retry',exact:true})).toBeVisible();await page.close();await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(settings.getByText('Saved to Rote',{exact:true})).toBeVisible();
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'create403'}});await invokeContextCapture(context,'https://example.com/');await expect(settings.getByRole('button',{name:'Retry',exact:true})).toBeVisible();await page.close();await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   const state=await(await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);
 });
 test('Bluesky nested menu preserves native typography and contains the entire row at zoom',async({context,extensionId})=>{
@@ -586,7 +586,7 @@ test('toast motion respects reduced motion and stays compact in light theme',asy
   await close.click({position:{x:box.width-3,y:box.height-3}});await expect(toast).toHaveCount(0);
 });
 
-test('toast enters with a slight spring and animates out',async({context,extensionId})=>{
+test('toast enters smoothly and animates out',async({context,extensionId})=>{
   await connect(context,extensionId);
   const page=await openX(context);
   await page.evaluate(()=>{
@@ -611,5 +611,59 @@ test('toast enters with a slight spring and animates out',async({context,extensi
   await toast.getByRole('button',{name:'Close',exact:true}).click();
   await expect(toast).toHaveAttribute('data-closing','');
   expect(await message.evaluate(el=>el.getAnimations().length)).toBeGreaterThan(0);
+  await expect(toast).toHaveCount(0);
+});
+
+test('toast morph preserves words, interrupts cleanly and exposes one accessible value', async ({context, extensionId}) => {
+  await connect(context, extensionId);
+  const page = await openX(context);
+  await page.getByRole('button', {name:'Share post'}).nth(1).click();
+  await page.locator('[data-rote-capture]').click();
+  const toast = page.locator('[data-rote-toast]');
+  const label = toast.locator('.rote-morph-label');
+  await expect(label).toHaveText('Saved to Rote');
+  await page.waitForTimeout(350);
+  const update = async (status: 'creating' | 'saved' | 'failed', error?: string) => {
+    await context.serviceWorkers()[0]!.evaluate(async ({status, error}) => {
+      const [tab] = await chrome.tabs.query({url:'https://x.com/*'});
+      await chrome.tabs.sendMessage(tab!.id!, {type:'task:changed', task: {
+        site:'x', id:'motion-test', sourceId:'1002', sourceUrl:'https://x.com/test/status/1002',
+        author:'Test', excerpt:'', status, error, updatedAt:new Date().toISOString(), imageCount:0, uploadedCount:0,
+      }});
+    }, {status, error});
+  };
+  // Slow down only state transitions, keeping the actual extension / Shadow DOM path.
+  await toast.locator('.text').evaluate(el => {
+    const word = Array.from(el.querySelectorAll('[data-segment]')).find(node => node.textContent === 'to');
+    word!.setAttribute('data-retained', '');
+    new MutationObserver(() => {
+      el.getAnimations({subtree:true}).forEach(animation => animation.updatePlaybackRate(.1));
+    }).observe(el, {childList:true, subtree:true});
+  });
+  await update('creating');
+  await expect(label).toHaveText('Saving to Rote…');
+  expect(await toast.locator('[data-retained]').count()).toBe(1);
+  expect(await toast.locator('.text').evaluate(el => el.getAnimations({subtree:true}).length)).toBeGreaterThan(0);
+  await page.waitForTimeout(600);
+  await page.screenshot({path:'test-results/visuals/toast-text-morph-slow.png'});
+  await update('failed', 'api_403');
+  await update('saved');
+  await expect(label).toHaveText('Saved to Rote');
+  await expect(toast.getByRole('button', {name:'Open settings'})).toBeHidden();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect.poll(() => toast.locator('.text').evaluate(el => el.getAnimations({subtree:true}).length)).toBe(0);
+  await expect(toast.locator('.text')).toMatchAriaSnapshot('- text: Saved to Rote');
+  await expect(toast.locator('[data-exiting]')).toHaveCount(0);
+  await expect(toast.locator('.rote-morph-visual')).toHaveAttribute('aria-hidden', 'true');
+  expect(await page.locator('head style[data-torph]').count()).toBe(0);
+  await update('failed', 'api_403');
+  await page.setViewportSize({width:320, height:568});
+  const bounds = (await toast.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(15);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(305);
+  await page.screenshot({path:'test-results/visuals/toast-recovery-320.png'});
+  const close = toast.getByRole('button', {name:'Close', exact:true});
+  const closeBounds = (await close.boundingBox())!;
+  await close.click({position:{x:closeBounds.width - 1, y:closeBounds.height / 2}});
   await expect(toast).toHaveCount(0);
 });
