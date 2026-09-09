@@ -12,7 +12,7 @@ export function App() {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const { settings, setSettings, tasks, reloadTasks, loaded, error, t } = useExtension();
+  const { language, settings, setSettings, tasks, reloadTasks, loaded, error, t } = useExtension();
   return <main className="page">
     <header className="brand"><img src="/rote.svg" alt="" /><div><h1>{t('app')}</h1><p className="subtitle">{t('tagline')}</p></div></header>
     {error ? <p className="error" role="alert">{t(error)}</p> : null}
@@ -20,7 +20,7 @@ export function App() {
       <div className="settings-column" ref={sidebar}>
         {loaded ? <ConnectionForm key={settings?.id ?? 'new'} settings={settings} onSaved={value => { setSettings(value); void reloadTasks(); }} t={t} /> : null}
       </div>
-      <div className="activity-column"><TaskList tasks={tasks} reload={reloadTasks} t={t} /></div>
+      <div className="activity-column"><TaskList language={language} tasks={tasks} reload={reloadTasks} t={t} /></div>
     </div>
   </main>;
 }

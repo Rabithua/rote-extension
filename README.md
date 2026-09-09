@@ -8,7 +8,7 @@
 
 ## 安装
 
-[Chrome 应用商店](https://chromewebstore.google.com/detail/cahpbdbfdfnmoachkjmcfgbbnmjcbpej)（新版审核通过后更新）。以下为开发者模式安装步骤：
+[Chrome 应用商店](https://chromewebstore.google.com/detail/cahpbdbfdfnmoachkjmcfgbbnmjcbpej)（0.4.8 已提交审核，通过后自动更新）。以下为开发者模式安装步骤：
 
 1. 解压发布 ZIP，保留整个 `chrome-mv3` 文件夹。
 2. 打开 `chrome://extensions`，开启「开发者模式」，点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的 `chrome-mv3` 文件夹。

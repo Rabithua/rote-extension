@@ -1,3 +1,4 @@
+import { languageFor, type Language } from '../locales/messages';
 import { MorphText } from './MorphText';
 import { StatusIcon } from './StatusIcon';
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import type { TaskView } from '../domain/task';
 import { send } from '../messaging/protocol';
 import { Button } from './button';
 
-export function TaskList({ tasks, t, reload, compact = false }: { tasks: TaskView[]; t: (key: string) => string; reload: () => Promise<void>; compact?: boolean }) {
+export function TaskList({ tasks, t, reload, compact = false, language = languageFor() }: { tasks: TaskView[]; t: (key: string) => string; reload: () => Promise<void>; compact?: boolean; language?: Language }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   async function act(task: TaskView, reconcile = false) {
@@ -27,10 +28,10 @@ export function TaskList({ tasks, t, reload, compact = false }: { tasks: TaskVie
       const active = ['queued','creating','uploading','finalizing'].includes(task.status);
       const status = task.status === 'saved' ? 'saved' : task.status === 'uncertain' ? 'uncertain' : task.status === 'failed' ? task.noteId ? 'partial' : 'failed' : 'saving';
       return <article className="task" key={task.id}>
-        <div className="task-head"><h3 className="task-title">{task.author}</h3><time dateTime={task.updatedAt}>{new Date(task.updatedAt).toLocaleTimeString([], { hour:'2-digit',minute:'2-digit' })}</time></div>
+        <div className="task-head"><h3 className="task-title">{task.author}</h3><time dateTime={task.updatedAt}>{new Date(task.updatedAt).toLocaleTimeString(language === 'zh' ? 'zh-CN' : 'en', { hour:'2-digit',minute:'2-digit' })}</time></div>
         {task.excerpt ? <p>{task.excerpt}</p> : null}
         <div className="status"><StatusIcon state={task.status === 'saved' ? 'saved' : active ? 'saving' : 'error'} /><MorphText>{t(status)}</MorphText></div>
-        {task.imageCount ? <p className="status"><Image size={14} aria-hidden="true" />{task.uploadedCount}/{task.imageCount} {t('images')} · {t('uploaded')}</p> : null}
+        {task.imageCount ? <p className="status"><Image size={14} aria-hidden="true" />{t('imageProgress').replace('{uploaded}', String(task.uploadedCount)).replace('{total}', String(task.imageCount))}</p> : null}
         {task.error && !compact ? <p className="hint">{t(task.error)}</p> : null}
         {task.permissionOrigin ? <p className="hint">{t('permissionHint')}<br />{task.permissionOrigin}</p> : null}
         <div className="task-actions">

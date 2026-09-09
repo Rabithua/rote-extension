@@ -93,7 +93,7 @@ test('recovers an upload failure into the same note',async({context,extensionId}
   const settings=await connect(context,extensionId);const page=await openX(context);
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});
   await page.getByRole('button',{name:'Share post'}).first().click();await page.locator('[data-rote-capture]').click();
-  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Text saved\. Images need attention\.$/})).toBeVisible();
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Text saved\. Images pending upload\.$/})).toBeVisible();
   await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(2);
 });
@@ -377,7 +377,7 @@ test('YouTube card menus and watch buttons share a video task with its cover',as
 test('YouTube watch captures survive cover upload failures and SPA navigation rejects stale metadata',async({context,extensionId})=>{
   const settings=await connect(context,extensionId);await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeFixture(true)}));
   const page=await context.newPage();await page.goto('https://www.youtube.com/watch?v=abcdefghijk');const button=page.locator('[data-rote-youtube=watch]');await expect(button).toBeVisible();
-  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});await button.click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Text saved\. Images need attention\.$/})).toBeVisible();
+  await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'upload'}});await button.click();await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Text saved\. Images pending upload\.$/})).toBeVisible();
   await settings.getByRole('button',{name:'Retry',exact:true}).click();await expect(button).toHaveText('Saved to Rote');
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
   await page.evaluate(()=>{document.dispatchEvent(new Event('yt-navigate-start'));history.pushState({},'', '/watch?v=lmnopqrstuv');document.dispatchEvent(new Event('yt-navigate-finish'));});await expect(button).toHaveCount(0);
@@ -468,7 +468,7 @@ test('generic bookmarks and exact multiline selections deduplicate independently
 test('generic capture guides setup',async({context,extensionId})=>{
   await context.route('https://example.com/**',r=>r.fulfill({contentType:'text/html',body:'<title>Reference</title><p>Text</p>'}));const page=await context.newPage();await page.goto('https://example.com/');
   await invokeContextCapture(context,'https://example.com/');await expect.poll(()=>context.pages().some(p=>p.url()===`chrome-extension://${extensionId}/options.html`)).toBe(true);
-  await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Connect Rote');
+  await expect(page.locator('[data-rote-toast]').getByRole('status')).toContainText('Connect to Rote');
 });
 test('Bilibili discards extraction after navigation while the API is pending',async({context,extensionId})=>{
   await connect(context,extensionId);
