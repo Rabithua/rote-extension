@@ -35,5 +35,5 @@ export function useExtension() {
     document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
     return () => query.removeEventListener('change',update);
   }, [theme, language]);
-  return { settings, setSettings, tasks, reloadTasks, loaded, error, t: (key: string) => translate(language,key) };
+  return { language, settings, setSettings, tasks, reloadTasks, loaded, error, t: (key: string) => translate(language,key) };
 }

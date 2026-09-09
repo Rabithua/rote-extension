@@ -1,26 +1,27 @@
 export const en = {
+  savePage: 'Save page to Rote', saveSelection: 'Save selection to Rote', imageProgress: 'Images uploaded: {uploaded}/{total}',
   openPage: 'Open page', openPaper: 'Open paper', openDiscussion: 'Open discussion',
   addPlatformTag: 'Add platform tag automatically', platformTagHint: 'Add the platform name or website hostname; duplicate tags are added only once.',
   tag_limit: 'Up to 20 tags, 50 characters each, including the platform tag. Adjust default tags or turn this option off.',
   defaultTags: 'Default tags', tagsHint: 'Separate tags with commas. Leave blank for no tags. Up to 20 tags, 50 characters each.',
-  defaultArchived: 'Archive new notes by default', archiveHint: 'New captures go directly to the archive in Rote. Existing notes and queued tasks are unchanged.',
+  defaultArchived: 'Archive by default', archiveHint: 'New captures go directly to the archive in Rote. Existing notes and queued tasks are unchanged.',
   defaultVisibility: 'Default visibility', visibilityPrivate: 'Private', visibilityPublic: 'Public',
   privateHint: 'New captures are visible only to you.', publicHint: 'New captures will be public in Rote.',
-  captureDefaultsHint: 'New captures use the tags and visibility in extension settings.',
+  captureDefaultsHint: 'New captures use your default tags, visibility and archive settings.',
   app: 'Rote', tagline: 'Keep what matters.', settings: 'Connection', activity: 'Recent captures',
   connectionHint: 'Save from X, GitHub, YouTube, Bilibili, Hacker News, arXiv and Bluesky, or right-click any webpage.', apiUrl: 'Rote service address',
   openKey: 'OpenKey', keyHint: 'Requires SENDROTE, UPLOADATTACHMENT and GETROTE. Stored only in this browser.',
-  connect: 'Connect Rote', connecting: 'Connecting…', connected: 'Connected', saveSettings: 'Save settings',
-  language: 'Language', theme: 'Appearance', system: 'System', light: 'Light', dark: 'Dark',
+  connect: 'Connect to Rote', connecting: 'Connecting…', connected: 'Connected', saveSettings: 'Save settings',
+  language: 'Language', theme: 'Appearance', system: 'Follow system', light: 'Light', dark: 'Dark',
   save: 'Save to Rote', saving: 'Saving to Rote…', saved: 'Saved to Rote', failed: 'Save failed',
-  partial: 'Text saved. Images need attention.', uncertain: 'Check save result', queued: 'Waiting to save',
+  partial: 'Text saved. Images pending upload.', uncertain: 'Check save result', queued: 'Waiting to save',
   retry: 'Retry', reconcile: 'Check in Rote', youtube_unavailable: 'Could not identify this video. Wait for the page to finish loading and try again.', openVideo: 'Open video', close: 'Close', openProject: 'Open project', openSource: 'Open original post', settingsLink: 'Open settings',
   emptyTitle: 'A place for what catches your eye', emptyBody: 'Use a supported site’s Save to Rote action, or right-click a webpage or selected text.',
-  private: 'Captures are saved as private notes.', images: 'images', uploaded: 'uploaded', grant: 'Allow upload host & retry',
+  private: 'Captures are saved as private notes.', images: 'images', uploaded: 'uploaded', grant: 'Allow upload access and retry',
   allTasks: 'View all captures', ready: 'Ready to capture', noteSaved: 'Note created',
-  not_configured: 'Connect Rote in extension settings first.',
+  not_configured: 'Connect to Rote in extension settings, then try saving again.',
   incomplete: 'Expand the full post before saving.', empty_capture: 'This post has no supported text or static images.',
-  unsupported: 'Could not read this post. Open its detail page and try again.',
+  unsupported: 'Could not read this content. Open its detail page and try again.',
   missing_permissions: 'This OpenKey needs SENDROTE, UPLOADATTACHMENT and GETROTE.',
   host_permission: 'Allow access to this server to continue.', invalid_address: 'Use an HTTPS service address (HTTP is allowed for localhost).',
   invalid_input: 'Check the connection settings and tag lengths.', not_allowed: 'This request is not allowed.',
@@ -32,12 +33,13 @@ export const en = {
   create_uncertain: 'The server may have saved this note. Check the result before retrying; another note will not be created automatically.',
   api_0: 'Could not reach Rote. Check the connection.', api_400: 'Rote rejected this request.',
   api_401: 'OpenKey is invalid or expired.', api_403: 'This key or account cannot perform this action.', api_404: 'This Rote API or note was not found.',
-  api_413: 'The capture exceeds the server’s size limit.', api_429: 'Rote is busy. Try again later.', api_500: 'Rote encountered a server error.',
+  api_413: 'The capture exceeds the server’s size limit.', api_429: 'Too many requests. Try again later.', api_500: 'Rote encountered a server error.',
   permissionsDenied: 'Permission was not granted.', checked: 'Check completed. Unresolved captures remain here for review.',
   permissionHint: 'The upload host below was returned by your configured Rote server.',
 } as const;
 export type MessageKey = keyof typeof en;
 export const zh: Record<MessageKey, string> = {
+  savePage: '保存当前网页到 Rote', saveSelection: '保存选中文字到 Rote', imageProgress: '已上传 {uploaded}/{total} 张图片',
   openPage: '打开网页', openPaper: '打开论文', openDiscussion: '打开讨论',
   addPlatformTag: '自动添加平台标签', platformTagHint: '添加平台名称或网站域名标签，与默认标签去重。',
   tag_limit: '包含平台标签在内最多 20 个标签，每个最多 50 个字符；请调整默认标签或关闭此选项。',
@@ -45,7 +47,7 @@ export const zh: Record<MessageKey, string> = {
   defaultArchived: '默认归档', archiveHint: '开启后，新采集的笔记直接归档；已有笔记和待处理任务不受影响。',
   defaultVisibility: '默认可见性', visibilityPrivate: '私密', visibilityPublic: '公开',
   privateHint: '新采集的笔记仅自己可见。', publicHint: '新采集的笔记将在 Rote 中公开可见。',
-  captureDefaultsHint: '新采集使用扩展设置中的默认标签和可见性。',
+  captureDefaultsHint: '新采集使用设置中的默认标签、可见性和归档状态。',
   app: 'Rote', tagline: '留住值得记下的内容。', settings: '连接设置', activity: '最近采集',
   connectionHint: '支持 X、GitHub、YouTube、B站、Hacker News、arXiv、Bluesky，也可右键保存网页和摘录。', apiUrl: 'Rote 服务地址',
   openKey: 'OpenKey', keyHint: '需要 SENDROTE、UPLOADATTACHMENT 和 GETROTE 权限，仅保存在当前浏览器。',
@@ -57,8 +59,8 @@ export const zh: Record<MessageKey, string> = {
   emptyTitle: '记下浏览时的灵光一现', emptyBody: '在支持的网站点击「保存到 Rote」，或右键保存网页和选中文字。',
   private: '采集内容将保存为私密笔记。', images: '张图片', uploaded: '已上传', grant: '允许上传域名并重试',
   allTasks: '查看全部采集', ready: '可以开始采集', noteSaved: '笔记已创建',
-  not_configured: '请先在扩展设置中连接 Rote。', incomplete: '请先展开帖子全文，再保存到 Rote。',
-  empty_capture: '这条帖子没有可采集的文字或静态图片。', unsupported: '无法读取这条帖子，请打开详情页后重试。',
+  not_configured: '请先在扩展设置中连接 Rote，再重新采集。', incomplete: '请先展开帖子全文，再保存到 Rote。',
+  empty_capture: '这条帖子没有可采集的文字或静态图片。', unsupported: '无法读取此内容，请打开详情页后重试。',
   missing_permissions: '此 OpenKey 需要 SENDROTE、UPLOADATTACHMENT 和 GETROTE 权限。',
   host_permission: '需要允许访问此服务器才能继续。', invalid_address: '请使用 HTTPS 服务地址，本地 localhost 可使用 HTTP。',
   invalid_input: '请检查连接设置及标签长度。', not_allowed: '无法执行此请求。',
@@ -76,7 +78,8 @@ export const zh: Record<MessageKey, string> = {
 };
 export type Language = 'zh' | 'en';
 export function languageFor(value = 'system', fallback = navigator.language): Language {
-  return (value === 'system' ? fallback : value).startsWith('zh') ? 'zh' : 'en';
+  const locale = value === 'system' ? fallback.trim() || navigator.language : value;
+  return /^zh(?:[-_]|$)/i.test(locale.trim()) ? 'zh' : 'en';
 }
 export function translate(language: Language, key: string): string {
   const dictionary = language === 'zh' ? zh : en;

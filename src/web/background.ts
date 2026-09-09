@@ -1,6 +1,6 @@
 import { taskView, type SaveTask } from '../domain/task';
 import { readSettings, protectStorage } from '../settings/store';
-import { languageFor } from '../locales/messages';
+import { languageFor, translate } from '../locales/messages';
 import type { SaveRunner } from '../tasks/runner';
 import { webCapture } from './capture';
 
@@ -17,10 +17,10 @@ export async function webChanged(task: SaveTask) {
 }
 export function installWebCapture(runner: SaveRunner, start: (id: string) => void) {
   const createMenus = async () => {
-    const settings = await readSettings(); const zh = languageFor(settings?.language) === 'zh';
+    const settings = await readSettings(); const language = languageFor(settings?.language);
     await chrome.contextMenus.removeAll();
-    chrome.contextMenus.create({ id: 'rote-page', title: zh ? '保存当前网页到 Rote' : 'Save page to Rote', contexts: ['page'], documentUrlPatterns: ['http://*/*', 'https://*/*'] });
-    chrome.contextMenus.create({ id: 'rote-selection', title: zh ? '保存选中文字到 Rote' : 'Save selection to Rote', contexts: ['selection'], documentUrlPatterns: ['http://*/*', 'https://*/*'] });
+    chrome.contextMenus.create({ id: 'rote-page', title: translate(language, 'savePage'), contexts: ['page'], documentUrlPatterns: ['http://*/*', 'https://*/*'] });
+    chrome.contextMenus.create({ id: 'rote-selection', title: translate(language, 'saveSelection'), contexts: ['selection'], documentUrlPatterns: ['http://*/*', 'https://*/*'] });
   };
   let setupTail = Promise.resolve();
   const setup = () => { setupTail = setupTail.then(createMenus).catch(() => undefined); return setupTail; };
