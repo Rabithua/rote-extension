@@ -72,8 +72,8 @@ export class GitHubAdapter implements SiteAdapter {
   update(task: TaskView) {
     if (task.site !== 'github' || task.sourceId !== this.sourceId || !this.button || !this.label) return;
     this.busy = ['queued','creating','uploading','finalizing'].includes(task.status);
-    this.button.disabled = this.busy || task.status === 'saved' || task.status === 'uncertain';
-    this.label.textContent = this.t(this.busy ? 'saving' : task.status === 'saved' ? 'saved' : task.status === 'uncertain' ? 'uncertain' : 'save');
+    this.button.disabled = this.busy;
+    this.label.textContent = this.t(this.busy ? 'saving' : task.status === 'saved' ? 'viewNote' : task.status === 'uncertain' ? 'uncertain' : 'save');
     if (task.sourceId === this.watchedSource) this.toast.showTask(task);
   }
   private clear() {

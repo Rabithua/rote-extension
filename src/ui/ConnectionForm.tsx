@@ -10,6 +10,7 @@ import { send } from '../messaging/protocol';
 
 export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | null; onSaved: (settings: Settings) => void; t: (key: string) => string }) {
   const [apiUrl, setApiUrl] = useState(settings?.apiUrl ?? 'https://rote.ink');
+  const [webUrl, setWebUrl] = useState(settings?.webUrl ?? '');
   const [openKey, setOpenKey] = useState(settings?.openKey ?? '');
   const [language, setLanguage] = useState<SettingsInput['language']>(settings?.language ?? 'system');
   const [theme, setTheme] = useState<SettingsInput['theme']>(settings?.theme ?? 'system');
@@ -30,7 +31,7 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
     try {
       // Permission request starts directly in the user's click gesture, before any network await.
       if (!await chrome.permissions.request({ origins: [originPattern(normalized)] })) throw new Error('permissionsDenied');
-      const result = await send({ type: 'settings:save', settings: { apiUrl: normalized, openKey, language, theme, defaultTags: tags, addPlatformTag, defaultVisibility, defaultArchived } });
+      const result = await send({ type: 'settings:save', settings: { apiUrl: normalized, webUrl, openKey, language, theme, defaultTags: tags, addPlatformTag, defaultVisibility, defaultArchived } });
       if (result.settings) { onSaved(result.settings); setSaved(true); }
     } catch (error) { setError(error instanceof Error ? error.message : 'save_failed'); }
     finally { setBusy(false); }
@@ -40,6 +41,7 @@ export function ConnectionForm({ settings, onSaved, t }: { settings: Settings | 
     <p className="section-intro">{t('connectionHint')}</p>
     <form onSubmit={submit}>
       <div className="field"><label htmlFor="apiUrl">{t('apiUrl')}</label><Input id="apiUrl" type="url" value={apiUrl} onChange={e => setApiUrl(e.target.value)} required autoComplete="url" /></div>
+      <div className="field"><label htmlFor="webUrl">{t('webUrl')}</label><Input id="webUrl" type="url" value={webUrl} onChange={e => setWebUrl(e.target.value)} /><p className="hint">{t('webUrlHint')}</p></div>
       <div className="field"><label htmlFor="openKey">{t('openKey')}</label><Input id="openKey" type="password" value={openKey} onChange={e => setOpenKey(e.target.value)} required autoComplete="off" spellCheck={false} aria-describedby="key-hint" /><p className="hint" id="key-hint">{t('keyHint')}</p></div>
       <div className="field"><label htmlFor="defaultTags">{t('defaultTags')}</label><Input id="defaultTags" value={defaultTags} onChange={e => setDefaultTags(e.target.value)} aria-describedby="tags-hint" /><p className="hint" id="tags-hint">{t('tagsHint')}</p></div>
       <div className="field">

@@ -49,3 +49,25 @@ it('searches archived notes when reconciling an archived capture', async () => {
   await new RoteClient(config,request).findNotes('https://example.com/',true);
   expect(new URL(String(request.mock.calls[0]![0])).searchParams.get('archived')).toBe('true');
 });
+
+it('records an ID independently of optional fields and sends a stable idempotency header', async () => {
+  const id=crypto.randomUUID();
+  const request=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({data:{id,content:null,attachments:'invalid'}})));
+  expect(await new RoteClient(config,request).createNote(capture(),undefined,id)).toEqual({id});
+  expect(request.mock.calls[0]![1]!.headers).toMatchObject({'Idempotency-Key':id});
+});
+it('parses Retry-After without exposing server response data', async () => {
+  const request=vi.fn<typeof fetch>().mockResolvedValue(new Response('secret',{status:429,headers:{'Retry-After':'120'}}));
+  await expect(new RoteClient(config,request).createNote(capture())).rejects.toMatchObject({status:429,retryAfter:120000,uncertain:false});
+});
+it('does not infer idempotency support when an older server only returns permissions', async () => {
+  const request=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({data:{permissions:['GETROTE']}})));
+  expect(await new RoteClient(config,request).connection()).toEqual({permissions:['GETROTE']});
+});
+
+it('classifies malformed reconciliation notes as unavailable API results', async () => {
+  const request=vi.fn<typeof fetch>().mockImplementation(async()=>new Response(JSON.stringify({data:{id:'invalid',content:null}})));
+  const client=new RoteClient(config,request);
+  await expect(client.getNote(crypto.randomUUID())).rejects.toEqual(new ApiFailure(200));
+  await expect(client.findNotes('https://example.com/')).rejects.toEqual(new ApiFailure(200));
+});

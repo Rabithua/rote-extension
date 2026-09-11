@@ -11,7 +11,7 @@ function harness() {
   const tasks = new Map<string, SaveTask>();
   const blobs = new Map<string,Blob>();
   const attached: RoteAttachment[] = [];
-  const noteId = crypto.randomUUID();
+  const noteId: string = crypto.randomUUID();
   const deps: RunnerDependencies = {
     settings: async () => settings,
     store: {
@@ -28,7 +28,7 @@ function harness() {
     upload: vi.fn(async () => {}), changed: vi.fn(),
   };
   const client = {
-    createNote: vi.fn(async () => ({id:noteId,content:'text'})),
+    createNote: vi.fn(async (_capture?: unknown, _defaults?: unknown, _identity?: string) => ({id:noteId,content:'text'})),
     getNote: vi.fn(async () => ({id:noteId,content:'text',attachments:attached})),
     findNotes: vi.fn(async (_sourceUrl: string, _archived = false) => [] as {id:string;content:string}[]),
     presign: vi.fn(async (): Promise<UploadManifest> => {
@@ -88,15 +88,15 @@ describe('durable save workflow', () => {
     const h=harness(); const original=h.client.finalize.getMockImplementation()!;
     h.client.finalize.mockImplementationOnce(async (...args) => { await original(...args); throw new ApiFailure(0,true); });
     const task=await h.runner.enqueue(imageCapture(),settings); await h.runner.start(task.id);
-    expect(h.tasks.get(task.id)?.status).toBe('failed');
-    await new SaveRunner(h.deps).start(task.id);
+    expect(h.tasks.get(task.id)?.status).toBe('waiting');
+    await new SaveRunner(h.deps).retry(task.id);
     expect(h.tasks.get(task.id)?.status).toBe('saved');
     expect(h.attached).toHaveLength(2);
   });
   it('does not send old-account tasks using new credentials', async () => {
     const h=harness(); const task=await h.runner.enqueue(capture(),settings);
     h.deps.settings=async()=>({...settings,id:'account-b'});
-    await h.runner.start(task.id);
+    await expect(h.runner.start(task.id)).rejects.toThrow('not_allowed');
     expect(h.client.createNote).not.toHaveBeenCalled();
   });
   it('allows explicit retry after a definitive permission failure', async () => {
@@ -126,8 +126,8 @@ it('keeps platform task identities separate and deduplicates GitHub captures', a
   const x = await runner.enqueue(capture(), settings);
   const a = await runner.enqueue(github, settings);
   const b = await runner.enqueue(github, settings);
-  expect(a.id).toBe('account-a:github:owner/repo');
-  expect(x.id).toBe('account-a:x:123');
+  expect(a.sourceKey).toBe('github:owner/repo');
+  expect(x.sourceKey).toBe('x:123'); expect(a.id).not.toBe(x.id);
   expect(a.id).toBe(b.id);expect(tasks.size).toBe(2);
 });
 
@@ -171,8 +171,10 @@ it('locks reconciliation against duplicate checks and deletion, then releases th
   rejectSearch(new ApiFailure(403)); await expect(checking).rejects.toThrow('api_403');
   await h.deps.store.putImage(task.id, 0, new Blob(['pending image']));
   await h.runner.remove(task.id);
-  expect(h.tasks.has(task.id)).toBe(false);
-  expect(await h.deps.store.image(task.id, 0)).toBeUndefined();
+  expect(h.tasks.get(task.id)?.hiddenAt).toBeDefined();
+  expect(await h.deps.store.image(task.id, 0)).toBeDefined();
+  await h.runner.restore(task.id);
+  expect(h.tasks.get(task.id)?.hiddenAt).toBeUndefined();
 });
 
 it('finds a note moved to the archive and counts the same note only once', async () => {
@@ -191,4 +193,232 @@ it('refuses removal of queued captures and records belonging to another account'
   h.deps.settings = async () => ({...settings, id:'other-account'});
   await expect(h.runner.remove(task.id)).rejects.toThrow('not_allowed');
   expect(h.tasks.has(task.id)).toBe(true);
+});
+
+function idempotentHarness() {
+  const h = harness();
+  const connection = {...settings, ownerId: crypto.randomUUID(), noteCreateIdempotency: 1 as const};
+  h.deps.settings = async () => connection;
+  const notes = new Map<string, string>();
+  h.client.createNote.mockImplementation(async (_, __, identity) => {
+    if (!identity) throw new Error('missing identity');
+    notes.set(identity, 'text'); return {id: identity, content:'text'};
+  });
+  return {...h, connection, notes};
+}
+
+it('persists the create identity before sending, then recovers a committed lost response once', async () => {
+  const h = idempotentHarness(); const create = h.client.createNote.getMockImplementation()!;
+  const task = await h.runner.enqueue(capture(), h.connection);
+  h.client.createNote.mockImplementationOnce(async (...args) => {
+    expect(h.tasks.get(task.id)).toMatchObject({createId:args[2], creation:'sent'});
+    await create(...args); throw new ApiFailure(0, true);
+  });
+  await h.runner.start(task.id);
+  expect(h.tasks.get(task.id)).toMatchObject({status:'waiting',retryCount:1});
+  const saved = h.tasks.get(task.id)!; saved.nextRetryAt = 0;
+  await new SaveRunner(h.deps).recover();
+  expect(h.tasks.get(task.id)).toMatchObject({status:'saved', noteId:task.createId});
+  expect(h.notes.size).toBe(1);
+  expect(h.client.createNote.mock.calls.map(call => call[2])).toEqual([task.createId, task.createId]);
+});
+
+it('recovers an interrupted idempotent creation without allocating another identity', async () => {
+  const h = idempotentHarness(); const task = await h.runner.enqueue(capture(), h.connection);
+  task.creation='sent'; task.status='creating'; await h.deps.store.put(task);
+  await new SaveRunner(h.deps).recover();
+  expect(h.tasks.get(task.id)).toMatchObject({status:'saved',noteId:task.createId});
+});
+
+it('never starts a request if the creation checkpoint cannot be stored', async () => {
+  const h = idempotentHarness(); const task = await h.runner.enqueue(capture(), h.connection);
+  h.deps.store.put = async () => { throw new DOMException('quota', 'QuotaExceededError'); };
+  await expect(h.runner.start(task.id)).rejects.toThrow();
+  expect(h.client.createNote).not.toHaveBeenCalled();
+});
+
+it('keeps a valid returned ID even when the server ignores the advertised identity', async () => {
+  const h = idempotentHarness(); const returned = crypto.randomUUID();
+  h.client.createNote.mockResolvedValue({id:returned,content:'text'});
+  const task = await h.runner.enqueue(capture(), h.connection); await h.runner.start(task.id);
+  expect(h.tasks.get(task.id)).toMatchObject({status:'uncertain',noteId:returned,error:'identity_mismatch'});
+  await h.runner.retry(task.id);
+  expect(h.client.getNote).toHaveBeenCalledWith(returned);
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+});
+
+it('limits automatic retries to three and respects Retry-After across restart', async () => {
+  const h = idempotentHarness(); const task = await h.runner.enqueue(capture(), h.connection);
+  h.client.createNote.mockRejectedValue(new ApiFailure(503,true,900_000));
+  await h.runner.start(task.id);
+  expect(h.tasks.get(task.id)!.nextRetryAt! - Date.now()).toBeGreaterThan(899_000);
+  for (let i=0;i<3;i++) { h.tasks.get(task.id)!.nextRetryAt=0; await new SaveRunner(h.deps).recover(); }
+  expect(h.tasks.get(task.id)).toMatchObject({status:'uncertain',retryCount:3});
+  await h.runner.recover(); expect(h.client.createNote).toHaveBeenCalledTimes(4);
+});
+
+it.each([400,401,403,409,413])('does not automatically retry a definitive %s rejection', async status => {
+  const h = idempotentHarness(); h.client.createNote.mockRejectedValue(new ApiFailure(status));
+  const task = await h.runner.enqueue(capture(), h.connection); await h.runner.start(task.id); await h.runner.recover();
+  expect(h.tasks.get(task.id)).toMatchObject({status:'failed',creation:'rejected'});
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+});
+
+it('does not treat an empty legacy search as permission to recreate', async () => {
+  const h = harness(); h.client.createNote.mockRejectedValueOnce(new ApiFailure(0,true));
+  const task = await h.runner.enqueue(capture(),settings); await h.runner.start(task.id);
+  expect(await h.runner.retry(task.id)).toBe('not_found');
+  expect(await h.runner.recreate(task.id,false)).toBe('not_found');
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+  await h.runner.recreate(task.id,true); await h.runner.recreate(task.id,true);
+  expect(h.client.createNote).toHaveBeenCalledTimes(2);
+  expect(h.tasks.size).toBe(2);
+});
+
+it('retains hidden creation identity and deduplicates future capture after cleanup', async () => {
+  const h = idempotentHarness(); const task = await h.runner.enqueue(capture(), h.connection); await h.runner.start(task.id);
+  await h.runner.remove(task.id); h.tasks.get(task.id)!.hiddenAt=Date.now()-31_000;
+  await h.runner.recover(); expect(h.tasks.get(task.id)?.compacted).toBe(true);
+  expect((await h.runner.enqueue(capture(), h.connection)).id).toBe(task.id);
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+  await expect(h.runner.restore(task.id)).rejects.toThrow('undo_expired');
+});
+
+it('cancels an in-flight create without losing its returned note ID or uploading images', async () => {
+  const h = idempotentHarness(); let finish!: () => void;
+  const task = await h.runner.enqueue(imageCapture(),h.connection);
+  h.client.createNote.mockImplementation(async () => { await new Promise<void>(resolve => { finish=resolve; }); return {id:task.createId!,content:'text'}; });
+  const running=h.runner.start(task.id); await vi.waitFor(()=>expect(finish).toBeDefined());
+  await h.runner.cancel(task.id); finish(); await running;
+  expect(h.tasks.get(task.id)).toMatchObject({status:'cancelled',noteId:task.createId,cancelRequested:true});
+  expect(h.client.presign).not.toHaveBeenCalled();
+});
+
+it('pauses uploads after an account switch and resumes with the original account', async () => {
+  const h = idempotentHarness(); const task=await h.runner.enqueue(imageCapture(),h.connection);
+  h.client.createNote.mockImplementation(async()=>{h.deps.settings=async()=>({...h.connection,id:'different'});return {id:task.createId!,content:'text'};});
+  await h.runner.start(task.id); expect(h.client.presign).not.toHaveBeenCalled();
+  expect(h.tasks.get(task.id)?.noteId).toBe(task.createId);
+  h.deps.settings=async()=>h.connection; await h.runner.recover();
+  expect(h.tasks.get(task.id)?.status).toBe('saved'); expect(h.client.createNote).toHaveBeenCalledTimes(1);
+});
+
+it('rebinds only verified same-owner tasks when credentials rotate', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);
+  const next={...h.connection,id:'new',openKey:crypto.randomUUID()};h.deps.settings=async()=>next;
+  await h.runner.rebind({...h.connection,ownerId:crypto.randomUUID()},next);
+  expect(h.tasks.get(task.id)?.configId).toBe(h.connection.id);
+  await h.runner.rebind(h.connection,next);expect(h.tasks.get(task.id)?.configId).toBe('new');
+});
+
+it('stops replay when a server withdraws its advertised capability', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);
+  task.creation='sent';task.status='creating';await h.deps.store.put(task);
+  h.deps.settings=async()=>({...h.connection,noteCreateIdempotency:undefined});
+  await h.runner.recover();expect(h.client.createNote).not.toHaveBeenCalled();expect(h.tasks.get(task.id)?.status).toBe('uncertain');
+});
+
+it('refreshes an expired image reservation without changing its upload identity', async () => {
+  const h=harness();const task=await h.runner.enqueue(imageCapture(),settings);
+  const uuid=crypto.randomUUID();
+  const batch={reservationId:'reservation',expiresAt:'2000-01-01',items:[{uuid,original:{key:`original/${uuid}.png`,putUrl:`https://storage.test/${uuid}.png`}}]};
+  h.client.presign.mockResolvedValueOnce(batch);
+  h.client.refresh.mockResolvedValueOnce({...batch,expiresAt:'2099-01-01'});
+  await h.runner.start(task.id);
+  expect(h.client.refresh).toHaveBeenCalledWith('reservation');expect(h.tasks.get(task.id)?.status).toBe('saved');expect(h.attached).toHaveLength(2);
+});
+
+it('finishes a confirmed replacement after a crash before its queue record was written', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);await h.runner.start(task.id);
+  const current=h.tasks.get(task.id)!;current.replacementId=crypto.randomUUID();
+  expect((await h.runner.find(task.capture,h.connection))?.id).toBe(task.id);
+  await h.runner.recover();const replacement=h.tasks.get(current.replacementId)!;
+  expect(replacement.status).toBe('saved');expect(h.notes.size).toBe(2);
+  await h.runner.recover();expect(h.notes.size).toBe(2);
+});
+
+it('never recreates an already deleted remote note during image recovery', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(imageCapture(),h.connection);
+  const current=h.tasks.get(task.id)!;current.noteId=task.createId;current.creation='confirmed';current.status='uploading';
+  h.client.getNote.mockRejectedValue(new ApiFailure(404));await h.runner.recover();
+  expect(h.tasks.get(task.id)).toMatchObject({status:'failed',error:'note_missing'});
+  expect(h.client.createNote).not.toHaveBeenCalled();expect(h.client.presign).not.toHaveBeenCalled();
+});
+
+it('automatically retries an unreadable 201 response only when idempotency is verified', async () => {
+  const h=idempotentHarness();h.client.createNote.mockRejectedValueOnce(new ApiFailure(201,true));
+  const task=await h.runner.enqueue(capture(),h.connection);await h.runner.start(task.id);
+  expect(h.tasks.get(task.id)).toMatchObject({status:'waiting',retryCount:1});
+  await h.runner.retry(task.id);expect(h.tasks.get(task.id)).toMatchObject({status:'saved',noteId:task.createId});
+});
+
+it('resumes namespace migration from its persisted journal after settings were already replaced', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);
+  const updated={...h.connection,id:'owner-namespace',migrationFrom:[h.connection.id]};h.deps.settings=async()=>updated;
+  await new SaveRunner(h.deps).rebind(updated,updated);
+  expect(h.tasks.get(task.id)?.configId).toBe(updated.id);
+  await new SaveRunner(h.deps).rebind(updated,updated);expect(h.tasks.size).toBe(1);
+});
+
+it('waits for old-key rejection during same-namespace rotation and recovers immediately', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);
+  let reject!:(error:Error)=>void;
+  h.client.createNote.mockImplementationOnce(()=>new Promise((_,fail)=>{reject=fail;}));
+  const running=h.runner.start(task.id);await vi.waitFor(()=>expect(reject).toBeDefined());
+  const next={...h.connection,openKey:crypto.randomUUID()};h.deps.settings=async()=>next;
+  let rebound=false;const binding=h.runner.rebind(h.connection,next).then(()=>{rebound=true;});
+  await Promise.resolve();expect(rebound).toBe(false);
+  reject(new ApiFailure(401));await running;await binding;await h.runner.recover();
+  expect(h.tasks.get(task.id)).toMatchObject({status:'saved',noteId:task.createId});
+  expect(h.client.createNote.mock.calls.map(call=>call[2])).toEqual([task.createId,task.createId]);
+});
+
+it('reveals removed unresolved captures when captured again after undo expires', async () => {
+  const h=harness();h.client.createNote.mockRejectedValueOnce(new ApiFailure(0,true));
+  const task=await h.runner.enqueue(capture(),settings);await h.runner.start(task.id);
+  await h.runner.remove(task.id);h.tasks.get(task.id)!.hiddenAt=Date.now()-60_000;
+  expect((await h.runner.enqueue(capture(),settings)).id).toBe(task.id);
+  expect(h.tasks.get(task.id)?.hiddenAt).toBeUndefined();
+  expect(await h.runner.recreate(task.id,false)).toBe('not_found');
+  await h.runner.recreate(task.id,true);expect(h.tasks.size).toBe(2);
+});
+
+it('finishes interrupted successor cache copying before attempting any source downloads', async () => {
+  const h=idempotentHarness();const source=await h.runner.enqueue(imageCapture(),h.connection);
+  const original=h.tasks.get(source.id)!;original.status='uncertain';original.replacementId=crypto.randomUUID();
+  const next=await h.runner.enqueue(source.capture,h.connection,{id:original.replacementId,defaults:source.noteDefaults!});
+  for(let i=0;i<2;i++)await h.deps.store.putImage(source.id,i,new Blob(['cached'],{type:'image/png'}));
+  await h.deps.store.putImage(next.id,0,new Blob(['already copied'],{type:'image/png'}));
+  // Newest-first storage order must not start the successor before recovering its blobs.
+  h.deps.store.list=async()=>structuredClone([...h.tasks.values()].reverse());
+  vi.mocked(h.deps.download).mockRejectedValue(new Error('source gone'));
+  await new SaveRunner(h.deps).recover();
+  expect(h.tasks.get(next.id)?.status).toBe('saved');expect(h.deps.download).not.toHaveBeenCalled();
+});
+
+it('allows explicit recreation after unavailable reconciliation while preserving the original snapshot', async () => {
+  const h=harness();h.client.createNote.mockRejectedValueOnce(new ApiFailure(0,true));
+  const task=await h.runner.enqueue(capture(),settings);await h.runner.start(task.id);
+  h.client.findNotes.mockRejectedValue(new ApiFailure(200));
+  expect(await h.runner.recreate(task.id,false)).toBe('unavailable');
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+  await h.runner.recreate(task.id,true);
+  expect(h.client.createNote).toHaveBeenCalledTimes(2);
+  expect(h.client.createNote.mock.calls[1]![0]).toEqual(task.capture);
+});
+
+it('preserves hidden successors during periodic recovery', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);await h.runner.start(task.id);
+  await h.runner.recreate(task.id,true);const id=h.tasks.get(task.id)!.replacementId!;
+  await h.runner.remove(id);await h.runner.recover();expect(h.tasks.get(id)?.hiddenAt).toBeDefined();
+});
+
+it('restores predecessor blobs even when a successor starts directly before recovery', async () => {
+  const h=idempotentHarness();const source=await h.runner.enqueue(imageCapture(),h.connection);
+  const original=h.tasks.get(source.id)!;original.status='uncertain';original.replacementId=crypto.randomUUID();
+  const next=await h.runner.enqueue(source.capture,h.connection,{id:original.replacementId,defaults:source.noteDefaults!});
+  for(let i=0;i<2;i++)await h.deps.store.putImage(source.id,i,new Blob(['cached'],{type:'image/png'}));
+  vi.mocked(h.deps.download).mockRejectedValue(new Error('source gone'));
+  await h.runner.start(next.id);
+  expect(h.tasks.get(next.id)?.status).toBe('saved');expect(h.deps.download).not.toHaveBeenCalled();
 });

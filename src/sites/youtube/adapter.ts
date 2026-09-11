@@ -25,6 +25,7 @@ export class YouTubeAdapter implements SiteAdapter {
   constructor(private bridge: AdapterBridge) { this.toast = new CaptureToast(key=>this.t(key),()=>bridge.openSettings()); }
   private t(key: string) { return translate(languageFor('system',document.documentElement.lang),key); }
   mount() {
+    this.navigating = false;
     document.addEventListener('click',this.onClick,true);
     document.addEventListener('keydown',this.onKey,true);
     document.addEventListener('yt-navigate-start',this.navigation);
@@ -125,7 +126,7 @@ export class YouTubeAdapter implements SiteAdapter {
     trigger?.focus({preventScroll:true});
   }
   private save(capture: VideoCapture) {
-    if(this.submitting.has(capture.sourceId)||this.tasks.get(capture.sourceId)?.status==='saved')return;
+    if(this.submitting.has(capture.sourceId))return;
     this.watchedId=capture.sourceId;this.submitting.add(capture.sourceId);this.toast.reset();this.toast.show('saving');this.renderAll();
     void this.bridge.save(capture).then(task=>{this.submitting.delete(capture.sourceId);if(task)this.update(task);},error=>{
       this.submitting.delete(capture.sourceId);this.renderAll();
@@ -135,8 +136,8 @@ export class YouTubeAdapter implements SiteAdapter {
   private readStatus(id:string){void this.bridge.status(id).then(task=>{if(task){this.tasks.set(id,task);this.renderAll();}}).catch(()=>undefined);}
   private render(element:HTMLElement,id:string){
     const status=this.tasks.get(id)?.status;const busy=this.submitting.has(id)||['queued','creating','uploading','finalizing'].includes(status??'');
-    const disabled=busy||status==='saved'||status==='uncertain';
-    const label=element.querySelector('span');const text=this.t(busy?'saving':status==='saved'?'saved':status==='uncertain'?'uncertain':'save');
+    const disabled=busy;
+    const label=element.querySelector('span');const text=this.t(busy?'saving':status==='saved'?'viewNote':status==='uncertain'?'uncertain':'save');
     if(label && label.textContent!==text)label.textContent=text;
     element.setAttribute('aria-disabled',String(disabled));if(element instanceof HTMLButtonElement)element.disabled=disabled;
   }
@@ -150,5 +151,5 @@ export class YouTubeAdapter implements SiteAdapter {
   private clearMenu(){this.menuStyles.splice(0).forEach(restore=>restore());this.row?.remove();this.row=undefined;this.menu=undefined;this.menuTarget=undefined;}
   private finished = ()=>{this.navigating=false;this.schedule();};
   private navigation = ()=>{this.navigating=true;this.clearMenu();this.watchButton?.remove();this.watchButton=undefined;this.watchId=undefined;this.watchedId=undefined;this.toast.hide();};
-  dispose(){this.observer?.disconnect();document.removeEventListener('click',this.onClick,true);document.removeEventListener('keydown',this.onKey,true);document.removeEventListener('yt-navigate-start',this.navigation);document.removeEventListener('yt-navigate-finish',this.finished);if(this.frame!==undefined)cancelAnimationFrame(this.frame);this.frame=undefined;this.navigation();}
+  dispose(){this.tasks.clear();this.observer?.disconnect();document.removeEventListener('click',this.onClick,true);document.removeEventListener('keydown',this.onKey,true);document.removeEventListener('yt-navigate-start',this.navigation);document.removeEventListener('yt-navigate-finish',this.finished);if(this.frame!==undefined)cancelAnimationFrame(this.frame);this.frame=undefined;this.navigation();}
 }

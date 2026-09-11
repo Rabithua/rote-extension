@@ -15,7 +15,7 @@ export async function webChanged(task: SaveTask) {
   const target = (await chrome.storage.session.get(key))[key] as Target | undefined;
   if (target) await feedback(target, { task: taskView(task) });
 }
-export function installWebCapture(runner: SaveRunner, start: (id: string) => void) {
+export function installWebCapture(runner: SaveRunner, start: (id: string) => void, connectionReady: () => Promise<unknown> = async () => {}) {
   const createMenus = async () => {
     const settings = await readSettings(); const language = languageFor(settings?.language);
     await chrome.contextMenus.removeAll();
@@ -46,6 +46,7 @@ export function installWebCapture(runner: SaveRunner, start: (id: string) => voi
     const result = results[0]; const page = result?.result;
     if (!page || page.url !== info.pageUrl || !['text/html','application/xhtml+xml'].includes(page.type) || !result.documentId) return;
     const target: Target = { tabId: tab.id, documentId: result.documentId, token: crypto.randomUUID(), url: page.url };
+    await connectionReady();
     const settings = await readSettings();
     const previous = await chrome.storage.session.get(null);
     await chrome.storage.session.remove(Object.entries(previous as Record<string, Target>).filter(([key,t]) => key.startsWith(prefix) && t.tabId === tab.id).map(([key]) => key));
@@ -61,7 +62,8 @@ export function installWebCapture(runner: SaveRunner, start: (id: string) => voi
       const task = await runner.enqueue(item, settings);
       await chrome.storage.session.set({ [prefix + task.id]: target });
       await feedback(target, { task: taskView(task) });
-      if (task.status === 'queued') start(task.id);
+      if (['failed','waiting','cancelled','uncertain'].includes(task.status)) void runner.retry(task.id).catch(() => undefined);
+      else if (task.status === 'queued') start(task.id);
     } catch (error) { await feedback(target, { key: error instanceof Error && error.message === 'tag_limit' ? 'tag_limit' : 'save_failed' }); }
   }
 }

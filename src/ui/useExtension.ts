@@ -21,6 +21,7 @@ export function useExtension() {
   useEffect(() => {
     void load();
     const listener = (message: {type?: string}) => {
+      if (message.type === 'connection:changed') void load();
       if (message.type === 'task:changed' || message.type === 'tasks:removed') void reloadTasks().catch(() => setError('save_failed'));
     };
     chrome.runtime.onMessage.addListener(listener);

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { normalizeApiUrl, settingsSchema, parseDefaultTags } from '../src/settings/store';
+import { describe, expect, it, vi } from 'vitest';
+import { normalizeApiUrl, settingsSchema, parseDefaultTags, writeSettings, configIdentity } from '../src/settings/store';
 describe('connection settings', () => {
   it('maps the official frontend to its verified API', () => {
     expect(normalizeApiUrl('https://rote.ink/')).toBe('https://api.rote.ink');
@@ -21,4 +21,17 @@ it('migrates existing settings to private with no tags and normalizes tag input'
   expect(settingsSchema.safeParse({...old,defaultTags:['a'.repeat(51)]}).success).toBe(false);
   expect(settingsSchema.safeParse({...old,defaultTags:Array.from({length:21},(_,i)=>String(i))}).success).toBe(false);
   expect(settingsSchema.safeParse({...old,defaultVisibility:'unknown'}).success).toBe(false);
+});
+
+it('persists the migration journal before replacing a legacy connection and retains it across rotation', async () => {
+  const input=settingsSchema.parse({apiUrl:'https://api.example.test',openKey:crypto.randomUUID(),theme:'system',language:'en'});
+  const legacyId=await configIdentity(input.apiUrl,input.openKey);let state:unknown={...input,id:legacyId};
+  vi.stubGlobal('chrome',{storage:{local:{get:async()=>({settings:state}),setAccessLevel:async()=>{},set:async(value:{settings:unknown})=>{state=value.settings;}}}});
+  try {
+    const ownerId=crypto.randomUUID();const migrated=await writeSettings(input,{ownerId,noteCreateIdempotency:1});
+    expect(migrated.id).not.toBe(legacyId);expect(migrated.migrationFrom).toEqual([legacyId]);
+    const rotated=await writeSettings({...input,openKey:crypto.randomUUID()},{ownerId,noteCreateIdempotency:1});
+    expect(rotated.id).toBe(migrated.id);expect(rotated.migrationFrom).toContain(legacyId);expect(rotated.credentialId).not.toBe(migrated.credentialId);
+    const downgraded=await writeSettings(rotated,{});expect(downgraded.id).toBe(rotated.id);expect(downgraded.migrationFrom).toContain(legacyId);
+  } finally {vi.unstubAllGlobals();}
 });

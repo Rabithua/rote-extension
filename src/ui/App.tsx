@@ -18,7 +18,7 @@ export function App() {
     {error ? <p className="error" role="alert">{t(error)}</p> : null}
     <div className="options-layout">
       <div className="settings-column" ref={sidebar}>
-        {loaded ? <ConnectionForm key={settings?.id ?? 'new'} settings={settings} onSaved={value => { setSettings(value); void reloadTasks(); }} t={t} /> : null}
+        {loaded ? <ConnectionForm key={JSON.stringify(settings && { ...settings, openKey: undefined })} settings={settings} onSaved={value => { setSettings(value); void reloadTasks(); }} t={t} /> : null}
       </div>
       <div className="activity-column"><TaskList language={language} tasks={tasks} reload={reloadTasks} t={t} /></div>
     </div>

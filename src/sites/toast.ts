@@ -15,8 +15,8 @@ export class CaptureToast {
   constructor(private t: (key: string) => string, private openSettings: () => Promise<void>) {}
   reset() { this.dismissed = false; }
   showTask(task: TaskView) {
-    const failed = task.status === 'failed' || task.status === 'uncertain';
-    const key = task.status === 'saved' ? 'saved' : task.status === 'uncertain' ? 'create_uncertain'
+    const failed = ['failed','uncertain','waiting','cancelled'].includes(task.status);
+    const key = task.status === 'waiting' ? 'waiting' : task.status === 'cancelled' ? (task.noteId ? 'cancelledPartial' : 'cancelled') : task.status === 'saved' ? 'saved' : task.status === 'uncertain' ? 'create_uncertain'
       : task.status === 'failed' ? task.noteId ? 'partial' : task.error ?? 'save_failed' : 'saving';
     this.show(key, failed);
   }

@@ -16,3 +16,11 @@ it('removes only the selected record and all its cached images', async () => {
   expect(await taskStore.get(other.id)).toEqual(other);
   expect(await taskStore.image(other.id, 0)).toBeDefined();
 });
+
+it('rejects a stale task writer atomically', async () => {
+  const task: SaveTask={id:crypto.randomUUID(),configId:'cas',capture:capture(),status:'queued',revision:1,createdAt:'2026-09-11',updatedAt:'2026-09-11',uploaded:[],batches:[],finalized:[]};
+  await taskStore.put(task,0);
+  await taskStore.put({...task,revision:2,cancelRequested:true},1);
+  await expect(taskStore.put({...task,revision:2,noteId:crypto.randomUUID()},1)).rejects.toThrow('task_changed');
+  expect(await taskStore.get(task.id)).toMatchObject({revision:2,cancelRequested:true});
+});
