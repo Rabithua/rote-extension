@@ -1,4 +1,14 @@
 export const en = {
+  reconciling: 'Checking…',
+  reconcile_matched: 'Found the saved note. Any pending image uploads have been retried; see the task status above.',
+  reconcile_not_found: 'No matching note was found in your notes or archive. No new note was created. Check in Rote before removing this record and capturing again.',
+  reconcile_mismatch: 'Found notes with this source link, but their text differs. Check them in Rote; this task was not linked or recreated.',
+  reconcile_ambiguous: 'Found multiple identical notes. Check them in Rote; this task was not linked or recreated.',
+  removeCapture: 'Delete record', removingCapture: 'Deleting…',
+  removeCaptureConfirm: 'Delete this capture record and its locally cached images? This does not delete any note in Rote. Capturing the same content again may create a duplicate note.',
+  task_busy: 'This capture is still saving or being checked. Try again when it finishes.',
+  task_changed: 'This capture has changed. Refresh the list to see its latest status.',
+
   savePage: 'Save page to Rote', saveSelection: 'Save selection to Rote', imageProgress: 'Images uploaded: {uploaded}/{total}',
   openPage: 'Open page', openPaper: 'Open paper', openDiscussion: 'Open discussion',
   addPlatformTag: 'Add platform tag automatically', platformTagHint: 'Add the platform name or website hostname; duplicate tags are added only once.',
@@ -39,6 +49,16 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const zh: Record<MessageKey, string> = {
+  reconciling: '正在核对…',
+  reconcile_matched: '已找到保存的笔记，并尝试补传待上传图片，请查看上方任务状态。',
+  reconcile_not_found: '在笔记和归档中未找到匹配结果，没有重新创建笔记。请先到 Rote 确认，再决定是否删除记录并重新采集。',
+  reconcile_mismatch: '找到了包含原文链接的笔记，但正文与采集内容不同。请到 Rote 人工核对，本次未关联或重新创建笔记。',
+  reconcile_ambiguous: '找到了多条内容相同的笔记。请到 Rote 人工核对，本次未关联或重新创建笔记。',
+  removeCapture: '删除记录', removingCapture: '正在删除…',
+  removeCaptureConfirm: '删除这条采集记录及本地缓存的图片？这不会删除 Rote 中的笔记。再次采集相同内容可能会创建重复笔记。',
+  task_busy: '此记录仍在保存或核对中，请结束后再操作。',
+  task_changed: '此记录的状态已变化，请刷新列表查看最新结果。',
+
   savePage: '保存当前网页到 Rote', saveSelection: '保存选中文字到 Rote', imageProgress: '已上传 {uploaded}/{total} 张图片',
   openPage: '打开网页', openPaper: '打开论文', openDiscussion: '打开讨论',
   addPlatformTag: '自动添加平台标签', platformTagHint: '添加平台名称或网站域名标签，与默认标签去重。',

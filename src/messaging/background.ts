@@ -20,6 +20,7 @@ const requestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tasks:list') }),
   z.object({ type: z.literal('tasks:retry'), id: z.string().max(400) }),
   z.object({ type: z.literal('tasks:reconcile'), id: z.string().max(400) }),
+  z.object({ type: z.literal('tasks:remove'), id: z.string().max(400) }),
 ]);
 const siteOrigins = {
   'https://x.com': 'x', 'https://github.com': 'github', 'https://www.youtube.com': 'youtube',
@@ -86,15 +87,20 @@ export function installBackground() {
     if (request.type === 'tasks:list') return { tasks: (await taskStore.list(settings.id)).map(taskView) };
     const task = await taskStore.get(request.id);
     if (!task || task.configId !== settings.id) throw new Error('not_allowed');
-    if (request.type === 'tasks:reconcile') { await runner.reconcile(task.id); return {}; }
+    if (request.type === 'tasks:reconcile') return { reconciliation: await runner.reconcile(task.id) };
+    if (request.type === 'tasks:remove') {
+      await runner.remove(task.id);
+      void chrome.runtime.sendMessage({ type: 'tasks:removed' }).catch(() => undefined);
+      return {};
+    }
     if (task.status === 'failed') start(task.id);
     return {};
   }
   chrome.runtime.onMessage.addListener((raw: unknown, sender, reply: (value: Reply) => void) => {
-    if (!raw || typeof raw !== 'object' || !('type' in raw) || raw.type === 'task:changed' || raw.type === 'web:settings') return false;
+    if (!raw || typeof raw !== 'object' || !('type' in raw) || raw.type === 'task:changed' || raw.type === 'tasks:removed' || raw.type === 'web:settings') return false;
     void handle(raw, sender).then(data => reply({ ok: true, data }), error => reply({ ok: false, error:
       error instanceof ApiFailure ? `api_${error.status}` : error instanceof z.ZodError ? 'invalid_input'
-        : error instanceof Error && ['not_allowed','host_permission','missing_permissions','not_configured','invalid_address','tag_limit'].includes(error.message) ? error.message : 'save_failed' }));
+        : error instanceof Error && ['task_busy','task_changed','not_allowed','host_permission','missing_permissions','not_configured','invalid_address','tag_limit'].includes(error.message) ? error.message : 'save_failed' }));
     return true;
   });
   const recover = () => { void ready.then(() => runner.recover()).catch(() => chrome.action.setBadgeText({ text: '!' })); };
