@@ -88,9 +88,9 @@ export class PageAdapter implements SiteAdapter {
     }
   }
 
-  private render(state: 'save' | 'saving' | 'saved' | 'uncertain') {
+  private render(state: 'save' | 'saving' | 'viewNote' | 'uncertain') {
     if (!this.button) return;
-    const disabled = state !== 'save';
+    const disabled = state === 'saving';
     this.button.disabled = disabled;
     this.button.setAttribute('aria-disabled', String(disabled));
     const translated = this.t(state);
@@ -103,7 +103,7 @@ export class PageAdapter implements SiteAdapter {
     if (task.site !== this.site || task.sourceId !== this.sourceId) return;
     if (this.routeId) this.tasks.set(this.routeId, task);
     this.busy = ['queued', 'creating', 'uploading', 'finalizing'].includes(task.status);
-    this.render(this.busy ? 'saving' : task.status === 'saved' ? 'saved'
+    this.render(this.busy ? 'saving' : task.status === 'saved' ? 'viewNote'
       : task.status === 'uncertain' ? 'uncertain' : 'save');
     if (task.sourceId === this.watchedSource) this.toast.showTask(task);
   }
@@ -114,6 +114,7 @@ export class PageAdapter implements SiteAdapter {
   }
 
   dispose() {
+    this.tasks.clear();
     this.observer?.disconnect();
     document.removeEventListener('rote:page-refresh', this.schedule);
     if (this.frame !== undefined) cancelAnimationFrame(this.frame);

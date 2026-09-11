@@ -5,13 +5,23 @@ interface TaskDatabase extends DBSchema {
   tasks: { key: string; value: SaveTask; indexes: { configId: string } };
   images: { key: string; value: Blob };
 }
-const database = () => openDB<TaskDatabase>('rote-capture', 1, { upgrade(db) {
-  db.createObjectStore('tasks', { keyPath: 'id' }).createIndex('configId', 'configId');
-  db.createObjectStore('images');
+const database = () => openDB<TaskDatabase>('rote-capture', 2, { upgrade(db, oldVersion) {
+  if (oldVersion < 1) {
+    db.createObjectStore('tasks', { keyPath: 'id' }).createIndex('configId', 'configId');
+    db.createObjectStore('images');
+  }
 } });
 export const taskStore = {
   async get(id: string) { return (await database()).get('tasks', id); },
-  async put(task: SaveTask) { await (await database()).put('tasks', task); },
+  async put(task: SaveTask, expectedRevision?: number) {
+    const tx = (await database()).transaction('tasks', 'readwrite');
+    const previous = await tx.store.get(task.id);
+    if (expectedRevision !== undefined && (previous?.revision ?? 0) !== expectedRevision) {
+      await tx.done;
+      throw new Error('task_changed');
+    }
+    await tx.store.put(task); await tx.done;
+  },
   async list(configId: string) { return (await (await database()).getAllFromIndex('tasks', 'configId', configId)).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)); },
   async image(id: string, index: number) { return (await database()).get('images', `${id}:${index}`); },
   async putImage(id: string, index: number, blob: Blob) { await (await database()).put('images', blob, `${id}:${index}`); },

@@ -61,7 +61,8 @@ export function installWebCapture(runner: SaveRunner, start: (id: string) => voi
       const task = await runner.enqueue(item, settings);
       await chrome.storage.session.set({ [prefix + task.id]: target });
       await feedback(target, { task: taskView(task) });
-      if (task.status === 'queued') start(task.id);
+      if (['failed','waiting','cancelled','uncertain'].includes(task.status)) void runner.retry(task.id).catch(() => undefined);
+      else if (task.status === 'queued') start(task.id);
     } catch (error) { await feedback(target, { key: error instanceof Error && error.message === 'tag_limit' ? 'tag_limit' : 'save_failed' }); }
   }
 }

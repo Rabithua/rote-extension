@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const settingsSchema = z.object({
   apiUrl: z.string().url().transform(normalizeApiUrl),
   openKey: z.string().trim().uuid(),
+  webUrl: z.string().transform(value => value.trim() ? normalizeWebUrl(value) : '').optional(),
   language: z.enum(['system', 'zh', 'en']),
   theme: z.enum(['system', 'light', 'dark']),
   defaultTags: z.array(z.string().trim().min(1).max(50)).max(20).transform(tags => [...new Set(tags)]).default([]),
@@ -10,9 +11,9 @@ export const settingsSchema = z.object({
   defaultArchived: z.boolean().default(false),
   defaultVisibility: z.enum(['private', 'public']).default('private'),
 });
-export const storedSettingsSchema = settingsSchema.extend({ id: z.string() });
+export const storedSettingsSchema = settingsSchema.extend({ id: z.string(), credentialId: z.string().optional(), ownerId: z.string().uuid().optional(), noteCreateIdempotency: z.literal(1).optional() });
 export type SettingsInput = z.input<typeof settingsSchema>;
-export type Settings = z.output<typeof settingsSchema> & { id: string };
+export type Settings = z.output<typeof storedSettingsSchema>;
 export function normalizeApiUrl(value: string): string {
   const url = new URL(value.trim());
   if (url.username || url.password || url.search || url.hash) throw new Error('invalid_address');
@@ -31,9 +32,9 @@ export async function readSettings(): Promise<Settings | null> {
   const { settings } = await chrome.storage.local.get('settings');
   return settings ? storedSettingsSchema.parse(settings) : null;
 }
-export async function writeSettings(input: SettingsInput): Promise<Settings> {
+export async function writeSettings(input: SettingsInput, identity?: { ownerId?: string; noteCreateIdempotency?: 1 }): Promise<Settings> {
   const parsed = settingsSchema.parse(input);
-  const settings = { ...parsed, id: await configIdentity(parsed.apiUrl, parsed.openKey) };
+  const settings = { ...parsed, ...identity, credentialId: await configIdentity(parsed.apiUrl, parsed.openKey), id: await configIdentity(parsed.apiUrl, identity?.ownerId ?? parsed.openKey) };
   await protectStorage();
   await chrome.storage.local.set({ settings });
   return settings;
@@ -42,4 +43,14 @@ export const originPattern = (url: string) => `${new URL(url).origin}/*`;
 
 export function parseDefaultTags(value: string): string[] {
   return [...new Set(value.split(/[,，\n]/).map(tag => tag.trim().replace(/^#+/, '').trim()).filter(Boolean))];
+}
+
+export function normalizeWebUrl(value: string): string {
+  const url = new URL(value.trim());
+  if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost','127.0.0.1'].includes(url.hostname)))) throw new Error('invalid_address');
+  return url.href.replace(/\/+$/, '');
+}
+export function noteUrl(settings: Settings, id: string): string | undefined {
+  const base = settings.webUrl || (settings.apiUrl === 'https://api.rote.ink' ? 'https://rote.ink' : undefined);
+  return base ? `${base}/rote/${encodeURIComponent(id)}` : undefined;
 }

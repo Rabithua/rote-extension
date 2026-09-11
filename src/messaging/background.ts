@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { captureSchema } from '../domain/capture';
 import { taskView, type SaveTask } from '../domain/task';
 import { ApiFailure, RoteClient } from '../rote/client';
-import { originPattern, protectStorage, readSettings, settingsSchema, writeSettings } from '../settings/store';
+import { originPattern, protectStorage, readSettings, settingsSchema, writeSettings, noteUrl } from '../settings/store';
 import { taskStore } from '../tasks/store';
 import { SaveRunner } from '../tasks/runner';
 import { downloadImage, uploadImage } from '../tasks/images';
@@ -21,6 +21,9 @@ const requestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tasks:retry'), id: z.string().max(400) }),
   z.object({ type: z.literal('tasks:reconcile'), id: z.string().max(400) }),
   z.object({ type: z.literal('tasks:remove'), id: z.string().max(400) }),
+  z.object({ type: z.literal('tasks:restore'), id: z.string().max(400) }),
+  z.object({ type: z.literal('tasks:cancel'), id: z.string().max(400) }),
+  z.object({ type: z.literal('tasks:recreate'), id: z.string().max(400), confirmed: z.boolean() }),
 ]);
 const siteOrigins = {
   'https://x.com': 'x', 'https://github.com': 'github', 'https://www.youtube.com': 'youtube',
@@ -36,17 +39,38 @@ export function isTrustedPage(sender: chrome.runtime.MessageSender): boolean {
   return sender.id === chrome.runtime.id && [chrome.runtime.getURL('options.html'), chrome.runtime.getURL('popup.html')].some(url => sender.url?.split('?')[0] === url);
 }
 function changed(task: SaveTask) {
+  void readSettings().then(settings => { if (settings?.id === task.configId) publishTask(task); });
+}
+function publishTask(task: SaveTask) {
   void chrome.runtime.sendMessage({ type: 'task:changed', task: taskView(task) }).catch(() => undefined);
   // Never include credentials or signed upload URLs in content-script notifications.
   if (task.capture.site === 'web') { void webChanged(task); return; }
   void chrome.tabs.query({ url: siteTabs[task.capture.site] }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
     : chrome.tabs.sendMessage(tab.id, { type: 'task:changed', task: taskView(task) }).catch(() => undefined))));
 }
+function resetPages() {
+  void chrome.runtime.sendMessage({ type: 'connection:changed' }).catch(() => undefined);
+  void chrome.tabs.query({ url: Object.values(siteTabs) }).then(tabs => Promise.all(tabs.map(tab => tab.id === undefined ? undefined
+    : chrome.tabs.sendMessage(tab.id, { type: 'connection:changed' }).catch(() => undefined))));
+}
 export function installBackground() {
   chrome.action.onClicked.addListener(() => { void chrome.runtime.openOptionsPage(); });
   const runner = new SaveRunner({ store: taskStore, settings: readSettings, client: settings => new RoteClient(settings),
     download: downloadImage, upload: uploadImage, changed });
   const ready = protectStorage();
+  // Refresh authenticated capabilities on worker startup so existing installations
+  // adopt the protocol after a server upgrade without re-entering their key.
+  const connectionReady = ready.then(async () => {
+    const previous = await readSettings(); if (!previous) return;
+    try {
+      const connection = await new RoteClient(previous).connection();
+      const current = await readSettings();
+      if (JSON.stringify(current) !== JSON.stringify(previous)) return;
+      const updated = await writeSettings(previous, { ownerId: connection.ownerId ?? previous.ownerId, noteCreateIdempotency: connection.capabilities?.noteCreateIdempotency === 1 ? 1 : undefined });
+      await runner.rebind(previous, updated);
+      if (JSON.stringify(previous) !== JSON.stringify(updated)) resetPages();
+    } catch { /* Keep the verified connection; normal task errors remain visible. */ }
+  });
   const start = (id: string) => { void runner.start(id).catch(() => chrome.action.setBadgeText({ text: '!' })); };
   installWebCapture(runner, start);
   async function handle(raw: unknown, sender: chrome.runtime.MessageSender): Promise<ResponseData> {
@@ -64,9 +88,13 @@ export function installBackground() {
     if (request.type === 'settings:get') return { settings };
     if (request.type === 'settings:save') {
       if (!await chrome.permissions.contains({ origins: [originPattern(request.settings.apiUrl)] })) throw new Error('host_permission');
-      const permissions = await new RoteClient(request.settings).permissions();
+      const connection = await new RoteClient(request.settings).connection();
+      const permissions = connection.permissions;
       if (!['SENDROTE','UPLOADATTACHMENT','GETROTE'].every(permission => permissions.includes(permission))) throw new Error('missing_permissions');
-      return { settings: await writeSettings(request.settings), permissions };
+      const updated = await writeSettings(request.settings, { ownerId: connection.ownerId, noteCreateIdempotency: connection.capabilities?.noteCreateIdempotency === 1 ? 1 : undefined });
+      await runner.rebind(settings, updated); resetPages();
+      void runner.recover();
+      return { settings: updated, permissions };
     }
     if (!settings) {
       if (request.type === 'status') return {};
@@ -74,40 +102,47 @@ export function installBackground() {
     }
     if (request.type === 'capture') {
       const task = await runner.enqueue(request.capture, settings);
-      if (task.status === 'queued') start(task.id);
+      if (['failed','waiting','cancelled','uncertain'].includes(task.status)) void runner.retry(task.id).catch(() => undefined);
+      else if (task.status === 'queued') start(task.id);
+      if (task.status === 'saved') { const url = task.noteId ? noteUrl(settings, task.noteId) : undefined; if (url) await chrome.tabs.create({ url }); else await chrome.runtime.openOptionsPage(); }
       return { task: taskView(task) };
     }
     if (request.type === 'status') {
       let sourceId = request.sourceId;
       if (request.site === 'bluesky' && !sourceId.startsWith('did:')) sourceId = (await remoteCapture({ site: 'bluesky', url: `https://bsky.app/profile/${sourceId}` })).sourceId;
       if (request.site === 'bilibili' && sourceId.startsWith('av')) sourceId = (await remoteCapture({ site: 'bilibili', url: `https://www.bilibili.com/video/${sourceId}` })).sourceId;
-      const task = await taskStore.get(`${settings.id}:${request.site}:${sourceId}`);
+      const task = await runner.find({ site: request.site, sourceId }, settings);
       return { task: task ? taskView(task) : undefined };
     }
-    if (request.type === 'tasks:list') return { tasks: (await taskStore.list(settings.id)).map(taskView) };
+    if (request.type === 'tasks:list') {
+      const tasks = await taskStore.list(settings.id);
+      return { tasks: tasks.filter(task => !task.hiddenAt && (!task.replacementId || !tasks.some(next => next.id === task.replacementId))).map(task => ({ ...taskView(task), noteUrl: task.noteId ? noteUrl(settings, task.noteId) : undefined })) };
+    }
     const task = await taskStore.get(request.id);
     if (!task || task.configId !== settings.id) throw new Error('not_allowed');
+    if (request.type === 'tasks:cancel') { await runner.cancel(task.id); return {}; }
+    if (request.type === 'tasks:restore') { await runner.restore(task.id); resetPages(); return {}; }
+    if (request.type === 'tasks:recreate') return { reconciliation: await runner.recreate(task.id, request.confirmed) };
     if (request.type === 'tasks:reconcile') return { reconciliation: await runner.reconcile(task.id) };
     if (request.type === 'tasks:remove') {
       await runner.remove(task.id);
-      void chrome.runtime.sendMessage({ type: 'tasks:removed' }).catch(() => undefined);
+      resetPages();
       return {};
     }
-    if (task.status === 'failed') start(task.id);
-    return {};
+    return { reconciliation: await runner.retry(task.id) };
   }
   chrome.runtime.onMessage.addListener((raw: unknown, sender, reply: (value: Reply) => void) => {
-    if (!raw || typeof raw !== 'object' || !('type' in raw) || raw.type === 'task:changed' || raw.type === 'tasks:removed' || raw.type === 'web:settings') return false;
+    if (!raw || typeof raw !== 'object' || !('type' in raw) || raw.type === 'task:changed' || raw.type === 'tasks:removed' || raw.type === 'connection:changed' || raw.type === 'web:settings') return false;
     void handle(raw, sender).then(data => reply({ ok: true, data }), error => reply({ ok: false, error:
-      error instanceof ApiFailure ? `api_${error.status}` : error instanceof z.ZodError ? 'invalid_input'
-        : error instanceof Error && ['task_busy','task_changed','not_allowed','host_permission','missing_permissions','not_configured','invalid_address','tag_limit'].includes(error.message) ? error.message : 'save_failed' }));
+      error instanceof DOMException && error.name === 'QuotaExceededError' ? 'storage_full' : error instanceof ApiFailure ? `api_${error.status}` : error instanceof z.ZodError ? 'invalid_input'
+        : error instanceof Error && ['task_busy','task_changed','undo_expired','capture_removed','identity_mismatch','not_allowed','host_permission','missing_permissions','not_configured','invalid_address','tag_limit'].includes(error.message) ? error.message : 'save_failed' }));
     return true;
   });
-  const recover = () => { void ready.then(() => runner.recover()).catch(() => chrome.action.setBadgeText({ text: '!' })); };
+  const recover = () => { void connectionReady.then(() => runner.recover()).catch(() => chrome.action.setBadgeText({ text: '!' })); };
   chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === 'resume-captures') recover(); });
   chrome.runtime.onStartup.addListener(recover);
-  chrome.runtime.onInstalled.addListener(() => { void chrome.alarms.create('resume-captures', { periodInMinutes: 1 }); });
-  void chrome.alarms.create('resume-captures', { periodInMinutes: 1 });
+  chrome.runtime.onInstalled.addListener(() => { void chrome.alarms.create('resume-captures', { periodInMinutes: 0.5 }); });
+  void chrome.alarms.create('resume-captures', { periodInMinutes: 0.5 });
   recover();
 }
 

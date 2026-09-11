@@ -143,8 +143,8 @@ export class XAdapter implements SiteAdapter {
     if (!this.row || this.row.dataset.roteCapture !== task.sourceId) return;
     const busy = ['queued','creating','uploading','finalizing'].includes(task.status);
     const label = this.row.querySelector('span');
-    if (label) label.textContent = this.t(task.status === 'saved' ? 'saved' : busy ? 'saving' : 'save');
-    this.row.setAttribute('aria-disabled', String(busy || task.status === 'saved'));
+    if (label) label.textContent = this.t(task.status === 'saved' ? 'viewNote' : busy ? 'saving' : 'save');
+    this.row.setAttribute('aria-disabled', String(busy));
   }
   update(task: TaskView) {
     if (task.site !== 'x') return;
@@ -153,6 +153,7 @@ export class XAdapter implements SiteAdapter {
     this.toast.showTask(task);
   }
   dispose() {
+    this.watchedSource = undefined;
     this.menu?.removeEventListener('keydown', this.menuKeys, true);
     this.observer?.disconnect(); this.clearTarget(); this.toast.hide();
     if (this.frame !== undefined) cancelAnimationFrame(this.frame);
