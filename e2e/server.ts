@@ -32,7 +32,15 @@ const server=createServer(async (req,res)=>{
     if(failure==='lost-create'){failure='';res.writeHead(201,{'Content-Type':'application/json'});res.end('{');return;}
     reply(note,201);return;
   }
-  if(path==='/notes/search'){reply(notes.filter(note=>note.content.includes(url.searchParams.get('keyword')!)));return;}
+  if(path==='/notes/search'){
+    const matches=notes.filter(note=>note.content.includes(url.searchParams.get('keyword')!));
+    if(failure==='search403'){reply({},403);return;}
+    if(failure==='search-empty'){reply([]);return;}
+    if(failure==='search-mismatch'){reply(matches.map(note=>({...note,content:note.content+' edited'})));return;}
+    if(failure==='search-ambiguous'){reply([...matches,...matches.map(note=>({...note,id:randomUUID()}))]);return;}
+    if(failure==='search-slow'){setTimeout(()=>reply(matches),800);return;}
+    reply(matches);return;
+  }
   if(path.startsWith('/notes/') && req.method==='GET'){const note=notes.find(note=>note.id===path.split('/').at(-1));reply(note,note?200:404);return;}
   if(path==='/attachments/presign'){
     reply({items:body.files.map((file:{contentType:string})=>{

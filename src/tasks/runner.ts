@@ -1,6 +1,6 @@
 import { noteContent, type CaptureItem } from '../domain/capture';
 import { captureTags } from '../domain/tags';
-import { activeStatuses, type SaveTask } from '../domain/task';
+import { activeStatuses, type ReconciliationResult, type SaveTask } from '../domain/task';
 import { ApiFailure, matchesUpload, type RoteClient } from '../rote/client';
 import type { Settings } from '../settings/store';
 import type { TaskStore } from './store';
@@ -17,7 +17,7 @@ export interface RunnerDependencies {
 }
 /** All task writes are owned by the background process. No page can write the queue. */
 export class SaveRunner {
-  private running = new Map<string, Promise<void>>();
+  private running = new Map<string, Promise<unknown>>();
   private enqueueTail: Promise<unknown> = Promise.resolve();
   constructor(private deps: RunnerDependencies) {}
   enqueue(capture: CaptureItem, settings: Settings): Promise<SaveTask> {
@@ -40,7 +40,7 @@ export class SaveRunner {
   }
   start(id: string): Promise<void> {
     const existing = this.running.get(id);
-    if (existing) return existing;
+    if (existing) return existing.then(() => undefined);
     const operation = this.run(id).finally(() => { this.running.delete(id); });
     this.running.set(id, operation);
     return operation;
@@ -56,19 +56,44 @@ export class SaveRunner {
       } else if (activeStatuses.includes(task.status)) await this.start(task.id);
     }
   }
-  async reconcile(id: string) {
-    if (this.running.has(id)) return;
+  reconcile(id: string): Promise<ReconciliationResult> {
+    if (this.running.has(id)) return Promise.reject(new Error('task_busy'));
+    const operation = this.checkResult(id).finally(() => { this.running.delete(id); });
+    this.running.set(id, operation);
+    return operation;
+  }
+  private async checkResult(id: string): Promise<ReconciliationResult> {
     const settings = await this.deps.settings();
     const task = await this.deps.store.get(id);
-    if (!settings || !task || task.configId !== settings.id || task.status !== 'uncertain') return;
+    if (!settings || !task || task.configId !== settings.id) throw new Error('not_allowed');
+    if (task.status !== 'uncertain') throw new Error('task_changed');
     const client = this.deps.client(settings);
-    const notes = await client.findNotes(task.capture.sourceUrl, task.noteDefaults?.archived ?? false);
+    // The note may have been moved into or out of the archive since creation.
+    const archived = task.noteDefaults?.archived ?? false;
+    const results = await Promise.all([client.findNotes(task.capture.sourceUrl, archived), client.findNotes(task.capture.sourceUrl, !archived)]);
+    const notes = [...new Map(results.flat().map(note => [note.id, note])).values()];
     const exact = notes.filter(note => note.content === noteContent(task.capture));
-    if (exact.length !== 1) return;
+    if (!notes.length) return 'not_found';
+    if (!exact.length) return 'mismatch';
+    if (exact.length > 1) return 'ambiguous';
     task.noteId = exact[0]!.id;
     task.status = 'uploading'; delete task.error;
     await this.persist(task);
-    await this.start(id);
+    // Keep the lock through image recovery; start() would wait on this operation.
+    await this.run(id);
+    return 'matched';
+  }
+  remove(id: string): Promise<void> {
+    if (this.running.has(id)) return Promise.reject(new Error('task_busy'));
+    const operation = (async () => {
+      const settings = await this.deps.settings();
+      const task = await this.deps.store.get(id);
+      if (!settings || !task || task.configId !== settings.id) throw new Error('not_allowed');
+      if (activeStatuses.includes(task.status)) throw new Error('task_busy');
+      await this.deps.store.remove(task);
+    })().finally(() => { this.running.delete(id); });
+    this.running.set(id, operation);
+    return operation;
   }
   private async run(id: string) {
     const settings = await this.deps.settings();

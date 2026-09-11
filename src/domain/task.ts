@@ -43,3 +43,5 @@ export function taskView(task: SaveTask): TaskView {
     uploadedCount: Math.max(task.uploaded.length, task.finalized.length) };
 }
 export const activeStatuses: TaskStatus[] = ['queued', 'creating', 'uploading', 'finalizing'];
+
+export type ReconciliationResult = 'matched' | 'not_found' | 'ambiguous' | 'mismatch';

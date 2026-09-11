@@ -35,6 +35,8 @@ describe('GitHub capture', () => {
     expect(isSiteRequestAllowed(sender,{type:'capture',capture})).toBe(true);
     expect(isSiteRequestAllowed({...sender,url:'https://x.com/home'},{type:'capture',capture})).toBe(false);
     expect(isSiteRequestAllowed(sender,{type:'settings:get'})).toBe(false);
+    expect(isSiteRequestAllowed(sender,{type:'tasks:remove',id:'account:github:owner/repo'})).toBe(false);
+    expect(isSiteRequestAllowed(sender,{type:'tasks:reconcile',id:'account:github:owner/repo'})).toBe(false);
     expect(isSiteRequestAllowed({...sender,frameId:1},{type:'capture',capture})).toBe(false);
     expect(isSiteRequestAllowed({...sender,url:'https://github.com.evil.test'},{type:'capture',capture})).toBe(false);
     expect(isSiteRequestAllowed(sender,{type:'status',site:'x',sourceId:'123'})).toBe(false);

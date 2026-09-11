@@ -20,6 +20,7 @@ function harness() {
       list: async configId => structuredClone([...tasks.values()].filter(task=>task.configId===configId)),
       image: async (id,index) => blobs.get(`${id}:${index}`),
       putImage: async (id,index,blob) => { blobs.set(`${id}:${index}`,blob); },
+      remove: async task => { tasks.delete(task.id); task.capture.images.forEach((_, index) => blobs.delete(`${task.id}:${index}`)); },
       releaseImages: async task => { task.capture.images.forEach((_,index)=>blobs.delete(`${task.id}:${index}`)); },
     },
     client: () => client,
@@ -29,7 +30,7 @@ function harness() {
   const client = {
     createNote: vi.fn(async () => ({id:noteId,content:'text'})),
     getNote: vi.fn(async () => ({id:noteId,content:'text',attachments:attached})),
-    findNotes: vi.fn(async () => [] as {id:string;content:string}[]),
+    findNotes: vi.fn(async (_sourceUrl: string, _archived = false) => [] as {id:string;content:string}[]),
     presign: vi.fn(async (): Promise<UploadManifest> => {
       const uuid = crypto.randomUUID();
       return {items:[{uuid, original:{key:`original/${uuid}.png`,putUrl:`https://storage.test/${uuid}.png`}}]};
@@ -143,4 +144,51 @@ it('reconciles an archived creation using capture-time defaults after settings c
   expect(h.client.findNotes).toHaveBeenCalledWith(task.capture.sourceUrl,true);
   expect(h.tasks.get(task.id)).toMatchObject({status:'saved',noteId});
   expect(h.client.createNote).toHaveBeenCalledTimes(1);
+});
+
+it('reports missing, edited and ambiguous results without recreating a note', async () => {
+  const h = harness();
+  h.client.createNote.mockRejectedValueOnce(new ApiFailure(0, true));
+  const task = await h.runner.enqueue(capture(), settings); await h.runner.start(task.id);
+  expect(await h.runner.reconcile(task.id)).toBe('not_found');
+  h.client.findNotes.mockResolvedValue([{id:'edited', content:'changed text'}]);
+  expect(await h.runner.reconcile(task.id)).toBe('mismatch');
+  h.client.findNotes.mockResolvedValue([{id:'a', content:noteContent(task.capture)}, {id:'b', content:noteContent(task.capture)}]);
+  expect(await h.runner.reconcile(task.id)).toBe('ambiguous');
+  expect(h.tasks.get(task.id)?.status).toBe('uncertain');
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+});
+
+it('locks reconciliation against duplicate checks and deletion, then releases the lock on failure', async () => {
+  const h = harness();
+  h.client.createNote.mockRejectedValueOnce(new ApiFailure(0, true));
+  const task = await h.runner.enqueue(imageCapture(), settings); await h.runner.start(task.id);
+  let rejectSearch!: (error: Error) => void;
+  h.client.findNotes.mockReturnValue(new Promise((_, reject) => { rejectSearch = reject; }));
+  const checking = h.runner.reconcile(task.id);
+  await expect(h.runner.reconcile(task.id)).rejects.toThrow('task_busy');
+  await expect(h.runner.remove(task.id)).rejects.toThrow('task_busy');
+  rejectSearch(new ApiFailure(403)); await expect(checking).rejects.toThrow('api_403');
+  await h.deps.store.putImage(task.id, 0, new Blob(['pending image']));
+  await h.runner.remove(task.id);
+  expect(h.tasks.has(task.id)).toBe(false);
+  expect(await h.deps.store.image(task.id, 0)).toBeUndefined();
+});
+
+it('finds a note moved to the archive and counts the same note only once', async () => {
+  const h = harness();
+  h.client.createNote.mockRejectedValueOnce(new ApiFailure(0, true));
+  const task = await h.runner.enqueue({...capture(), images:[]}, settings); await h.runner.start(task.id);
+  h.client.findNotes.mockImplementation(async (_, archived) => archived ? [{id:'archived-note', content:noteContent(task.capture)}] : []);
+  expect(await h.runner.reconcile(task.id)).toBe('matched');
+  expect(h.tasks.get(task.id)).toMatchObject({status:'saved', noteId:'archived-note'});
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+});
+
+it('refuses removal of queued captures and records belonging to another account', async () => {
+  const h = harness(); const task = await h.runner.enqueue(capture(), settings);
+  await expect(h.runner.remove(task.id)).rejects.toThrow('task_busy');
+  h.deps.settings = async () => ({...settings, id:'other-account'});
+  await expect(h.runner.remove(task.id)).rejects.toThrow('not_allowed');
+  expect(h.tasks.has(task.id)).toBe(true);
 });

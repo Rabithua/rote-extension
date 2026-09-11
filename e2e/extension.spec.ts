@@ -667,3 +667,46 @@ test('toast morph preserves words, interrupts cleanly and exposes one accessible
   await close.click({position:{x:closeBounds.width - 1, y:closeBounds.height / 2}});
   await expect(toast).toHaveCount(0);
 });
+
+test('unresolved checks show inline outcomes and records can be removed without deleting notes', async ({context, extensionId}) => {
+  const settings = await connect(context, extensionId, 'zh'); const page = await openX(context);
+  await context.request.post('http://127.0.0.1:43119/__fail', {data:{failure:'lost-create'}});
+  await page.getByRole('button', {name:'Share post'}).nth(1).click(); await page.locator('[data-rote-capture]').click();
+  const task = settings.locator('.task');
+  const check = task.getByRole('button', {name:'核对 Rote 中的结果', exact:true});
+  await expect(check).toBeVisible();
+  for (const [failure, result] of [['search-empty','在笔记和归档中未找到匹配结果'], ['search-mismatch','正文与采集内容不同'], ['search-ambiguous','找到了多条内容相同的笔记'], ['search403','此密钥或账号无权执行该操作']]) {
+    await context.request.post('http://127.0.0.1:43119/__fail', {data:{failure}});
+    await check.click();
+    await expect(task.locator('.feedback')).toContainText(result!);
+    await expect(check).toBeEnabled();
+  }
+  settings.once('dialog', dialog => dialog.dismiss());
+  await task.getByRole('button', {name:'删除记录', exact:true}).click();
+  await expect(task).toHaveCount(1);
+  await settings.setViewportSize({width:360, height:780});
+  await task.screenshot({path:'test-results/visuals/reconcile-feedback-narrow.png'});
+  const otherSettings = await context.newPage(); await otherSettings.goto(`chrome-extension://${extensionId}/options.html`);
+  await expect(otherSettings.locator('.task')).toHaveCount(1);
+  settings.once('dialog', async dialog => { expect(dialog.message()).toContain('不会删除 Rote 中的笔记'); await dialog.accept(); });
+  const remove = task.getByRole('button', {name:'删除记录', exact:true}); const bounds = (await remove.boundingBox())!;
+  await remove.click({position:{x:bounds.width-5,y:bounds.height-5}});
+  await expect(task).toHaveCount(0); await expect(otherSettings.locator('.task')).toHaveCount(0);
+  await settings.reload(); await expect(task).toHaveCount(0);
+  const state = await (await context.request.get('http://127.0.0.1:43119/__state')).json(); expect(state.data.notes).toHaveLength(1);
+});
+
+test('checking shows progress, disables conflicting actions and completes without duplicating the note', async ({context, extensionId}) => {
+  const settings = await connect(context, extensionId); const page = await openX(context);
+  await context.request.post('http://127.0.0.1:43119/__fail', {data:{failure:'lost-create'}});
+  await page.getByRole('button', {name:'Share post'}).nth(1).click(); await page.locator('[data-rote-capture]').click();
+  const task = settings.locator('.task'); const check = task.getByRole('button', {name:'Check in Rote',exact:true});
+  await expect(check).toBeVisible();
+  await context.request.post('http://127.0.0.1:43119/__fail', {data:{failure:'search-slow'}});
+  await check.click();
+  await expect(task.getByRole('button', {name:'Checking…',exact:true})).toBeDisabled();
+  await expect(task.getByRole('button', {name:'Delete record',exact:true})).toBeDisabled();
+  await expect(task.locator('.feedback')).toContainText('Found the saved note');
+  await expect(task.locator('.status .rote-morph-label')).toHaveText('Saved to Rote');
+  const state = await (await context.request.get('http://127.0.0.1:43119/__state')).json(); expect(state.data.notes).toHaveLength(1);
+});
