@@ -14,3 +14,11 @@ it('rejects old revisions that arrive after the completion broadcast',()=>{
   const bridge=createAdapterBridge('x');expect(bridge.accept(task)).toBe(true);
   expect(bridge.accept({...task,revision:1,status:'creating'})).toBe(false);
 });
+it('uses the current account result for delayed unsolicited events after reset',async()=>{
+  const current={...task,id:'new-account-task',status:'queued' as const};
+  const request=vi.fn().mockResolvedValue({ok:true,data:{task:current}});
+  vi.stubGlobal('chrome',{runtime:{sendMessage:request}});
+  const bridge=createAdapterBridge('x');bridge.reset();
+  expect(await bridge.refresh(task)).toEqual(current);
+  expect(request).toHaveBeenCalledWith({type:'status',site:'x',sourceId:task.sourceId});
+});

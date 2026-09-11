@@ -25,6 +25,7 @@ export class YouTubeAdapter implements SiteAdapter {
   constructor(private bridge: AdapterBridge) { this.toast = new CaptureToast(key=>this.t(key),()=>bridge.openSettings()); }
   private t(key: string) { return translate(languageFor('system',document.documentElement.lang),key); }
   mount() {
+    this.navigating = false;
     document.addEventListener('click',this.onClick,true);
     document.addEventListener('keydown',this.onKey,true);
     document.addEventListener('yt-navigate-start',this.navigation);

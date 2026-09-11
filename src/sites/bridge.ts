@@ -4,7 +4,7 @@ import { send, type Request } from '../messaging/protocol';
 import type { AdapterBridge } from './adapter';
 
 /** Discard responses from a previous page/connection and older task revisions. */
-export function createAdapterBridge(site: CaptureItem['site']): AdapterBridge & { reset(): void; accept(task: TaskView): boolean } {
+export function createAdapterBridge(site: CaptureItem['site']): AdapterBridge & { reset(): void; accept(task: TaskView): boolean; refresh(task: TaskView): Promise<TaskView | undefined> } {
   let generation = 0;
   const revisions = new Map<string, number>();
   const accept = (task: TaskView) => {
@@ -22,6 +22,8 @@ export function createAdapterBridge(site: CaptureItem['site']): AdapterBridge & 
   return {
     save: capture => requestTask({ type: 'capture', capture }),
     status: sourceId => requestTask({ type: 'status', site, sourceId }),
+    // Events are invalidations: query the current connection instead of trusting a delayed payload.
+    refresh: task => task.site === site ? requestTask({ type: 'status', site, sourceId: task.sourceId }) : Promise.resolve(undefined),
     openSettings: async () => { await send({ type: 'open-settings' }); },
     reset: () => { generation++; revisions.clear(); }, accept,
   };

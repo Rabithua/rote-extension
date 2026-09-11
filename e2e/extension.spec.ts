@@ -625,6 +625,12 @@ test('toast morph preserves words, interrupts cleanly and exposes one accessible
   await page.waitForTimeout(350);
   const update = async (status: 'creating' | 'saved' | 'failed', error?: string) => {
     await context.serviceWorkers()[0]!.evaluate(async ({status, error}) => {
+      const database=await new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open('rote-capture',2);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+      await new Promise<void>((resolve,reject)=>{
+        const transaction=database.transaction('tasks','readwrite');const store=transaction.objectStore('tasks');const request=store.getAll();
+        request.onsuccess=()=>{const task=request.result.find(task=>task.capture.sourceId==='1002');store.put({...task,status,error,revision:(task.revision??0)+1});};
+        transaction.oncomplete=()=>resolve();transaction.onerror=()=>reject(transaction.error);
+      });database.close();
       const [tab] = await chrome.tabs.query({url:'https://x.com/*'});
       await chrome.tabs.sendMessage(tab!.id!, {type:'task:changed', task: {
         site:'x', id:'motion-test', sourceId:'1002', sourceUrl:'https://x.com/test/status/1002',
@@ -776,4 +782,18 @@ test('same-owner key rotation updates both windows and keeps the existing note',
   const newPage=context.waitForEvent('page');await other.getByRole('link',{name:'View note',exact:true}).click();const notePage=await newPage;
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();await expect(notePage).toHaveURL(`https://rote-front.test/rote/${state.data.notes[0].id}`);
   expect(state.data.notes).toHaveLength(1);
+});
+
+test('YouTube watch controls survive connection broadcasts without a navigation event',async({context,extensionId})=>{
+  const settings=await connect(context,extensionId);
+  await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeFixture(true)}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/watch?v=abcdefghijk');
+  await expect(page.locator('[data-rote-youtube=watch]')).toBeVisible();
+  await settings.locator('button[type=submit]').click();
+  await expect(settings.getByRole('status').filter({hasText:'Connected'})).toBeVisible();
+  await expect(page.locator('[data-rote-youtube=watch]')).toBeVisible();
+  const button=page.locator('[data-rote-youtube=watch]');
+  await expect.poll(()=>button.evaluate(el=>{const r=el.getBoundingClientRect();return [[2,r.height/2],[r.width-2,r.height/2],[r.width/2,2],[r.width/2,r.height-2]].every(([x,y])=>el.contains(document.elementFromPoint(r.x+x!,r.y+y!)));})).toBe(true);
+  const bounds=(await button.boundingBox())!;await button.click({position:{x:2,y:bounds.height/2}});
+  await expect(settings.locator('.task .rote-morph-label').filter({hasText:/^Saved to Rote$/})).toBeVisible();
 });

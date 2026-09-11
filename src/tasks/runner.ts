@@ -34,7 +34,10 @@ export class SaveRunner {
       const current = await this.deps.settings();
       if (current?.id !== settings.id) throw new Error('not_allowed');
       const existing = replacement ? await this.deps.store.get(replacement.id) : await this.find(capture, settings);
-      if (existing) return existing;
+      if (existing) {
+        if (!replacement && existing.hiddenAt && !existing.compacted) { delete existing.hiddenAt; await this.persist(existing); }
+        return existing;
+      }
       const now = new Date().toISOString();
       const task: SaveTask = { id: replacement?.id ?? crypto.randomUUID(), sourceKey: sourceKey(capture), configId: settings.id,
         createId: crypto.randomUUID(), createProtocol: settings.noteCreateIdempotency, creation: 'pending', retryCount: 0,
@@ -71,26 +74,30 @@ export class SaveRunner {
     return { settings, task };
   }
   async rebind(previous: Settings | null, settings: Settings) {
-    if (!previous || previous.apiUrl !== settings.apiUrl || !settings.ownerId ||
-      !(previous.ownerId ? previous.ownerId === settings.ownerId : previous.openKey === settings.openKey) || previous.id === settings.id) return;
+    if (!settings.ownerId) return;
+    const aliases = new Set(settings.migrationFrom ?? []);
+    if (previous?.apiUrl === settings.apiUrl &&
+      (previous.ownerId ? previous.ownerId === settings.ownerId : previous.openKey === settings.openKey)) aliases.add(previous.id);
+    aliases.delete(settings.id);
+    const sameOwner = previous?.apiUrl === settings.apiUrl && previous.ownerId === settings.ownerId;
+    if (!aliases.size && !sameOwner) return;
+    await this.enqueueTail;
     await Promise.allSettled([...this.running.values()]);
     if ((await this.deps.settings())?.id !== settings.id) return;
-    for (const task of await this.deps.store.list(previous.id)) {
+    for (const alias of aliases) for (const task of await this.deps.store.list(alias)) {
       task.configId = settings.id; await this.persist(task);
     }
   }
   async recover() {
     const settings = await this.deps.settings(); if (!settings) return;
+    // Restore successor caches before any queued successor can attempt a source download.
+    for (const source of await this.deps.store.list(settings.id)) {
+      if (!source.replacementId || this.running.has(source.id) || this.running.has(source.replacementId)) continue;
+      const replacement = await this.enqueue(source.capture, settings, { id: source.replacementId, defaults: source.noteDefaults ?? { tags: [], visibility: 'private' } });
+      await this.copyImages(source, replacement);
+    }
     for (const task of await this.deps.store.list(settings.id)) {
       if (this.running.has(task.id)) continue;
-      if (task.replacementId && !await this.deps.store.get(task.replacementId)) {
-        const replacement = await this.enqueue(task.capture, settings, { id: task.replacementId, defaults: task.noteDefaults ?? { tags: [], visibility: 'private' } });
-        for (let i = 0; i < task.capture.images.length; i++) {
-          const blob = await this.deps.store.image(task.id, i);
-          if (blob) await this.deps.store.putImage(replacement.id, i, blob);
-        }
-        await this.start(replacement.id);
-      }
       if (task.status === 'uncertain' && task.cancelRequested && task.createProtocol && (task.retryCount ?? 0) < 3 && (task.nextRetryAt ?? 0) <= Date.now()) {
         await this.lock(task.id, async () => {
           try { await this.checkResult(task.id); } catch (error) {
@@ -162,12 +169,17 @@ export class SaveRunner {
       // Persist the successor first so a restart or duplicate click reuses it.
       task.replacementId ??= crypto.randomUUID(); await this.persist(task);
       const next = await this.enqueue(task.capture, settings, { id: task.replacementId, defaults: task.noteDefaults ?? { tags: [], visibility: 'private' } });
-      for (let i = 0; i < task.capture.images.length; i++) {
-        const blob = await this.deps.store.image(task.id, i);
-        if (blob) await this.deps.store.putImage(next.id, i, blob);
-      }
+      await this.copyImages(task, next);
       await this.start(next.id);
     });
+  }
+  private async copyImages(source: SaveTask, target: SaveTask) {
+    if (target.status === 'saved' || target.compacted) return;
+    for (let i = 0; i < source.capture.images.length; i++) {
+      if (await this.deps.store.image(target.id, i)) continue;
+      const blob = await this.deps.store.image(source.id, i);
+      if (blob) await this.deps.store.putImage(target.id, i, blob);
+    }
   }
   async cancel(id: string) {
     const { task } = await this.owned(id);
@@ -209,6 +221,8 @@ export class SaveRunner {
       if (connection?.id !== settings.id || connection.openKey !== settings.openKey) throw new Paused();
     };
     try {
+      const predecessor = (await this.deps.store.list(settings.id)).find(source => source.replacementId === task.id);
+      if (predecessor) await this.copyImages(predecessor, task);
       if (task.creation === 'sent' && !task.noteId && (!task.createProtocol || settings.noteCreateIdempotency !== 1)) {
         task.status = 'uncertain'; task.error = 'create_uncertain'; await this.persist(task); return;
       }
@@ -254,6 +268,11 @@ export class SaveRunner {
           task.retryCount = attempts + 1; task.nextRetryAt = Date.now() + Math.max(backoff[attempts]!, error.retryAfter);
           task.status = 'waiting';
         }
+      }
+      const connection = await this.deps.settings();
+      if (!task.cancelRequested && connection?.id === settings.id && connection.openKey !== settings.openKey &&
+        error instanceof ApiFailure && [401,403].includes(error.status)) {
+        task.status = 'queued'; delete task.nextRetryAt;
       }
       await this.persist(task);
     }

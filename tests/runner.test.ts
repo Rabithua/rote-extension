@@ -351,3 +351,74 @@ it('automatically retries an unreadable 201 response only when idempotency is ve
   expect(h.tasks.get(task.id)).toMatchObject({status:'waiting',retryCount:1});
   await h.runner.retry(task.id);expect(h.tasks.get(task.id)).toMatchObject({status:'saved',noteId:task.createId});
 });
+
+it('resumes namespace migration from its persisted journal after settings were already replaced', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);
+  const updated={...h.connection,id:'owner-namespace',migrationFrom:[h.connection.id]};h.deps.settings=async()=>updated;
+  await new SaveRunner(h.deps).rebind(updated,updated);
+  expect(h.tasks.get(task.id)?.configId).toBe(updated.id);
+  await new SaveRunner(h.deps).rebind(updated,updated);expect(h.tasks.size).toBe(1);
+});
+
+it('waits for old-key rejection during same-namespace rotation and recovers immediately', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);
+  let reject!:(error:Error)=>void;
+  h.client.createNote.mockImplementationOnce(()=>new Promise((_,fail)=>{reject=fail;}));
+  const running=h.runner.start(task.id);await vi.waitFor(()=>expect(reject).toBeDefined());
+  const next={...h.connection,openKey:crypto.randomUUID()};h.deps.settings=async()=>next;
+  let rebound=false;const binding=h.runner.rebind(h.connection,next).then(()=>{rebound=true;});
+  await Promise.resolve();expect(rebound).toBe(false);
+  reject(new ApiFailure(401));await running;await binding;await h.runner.recover();
+  expect(h.tasks.get(task.id)).toMatchObject({status:'saved',noteId:task.createId});
+  expect(h.client.createNote.mock.calls.map(call=>call[2])).toEqual([task.createId,task.createId]);
+});
+
+it('reveals removed unresolved captures when captured again after undo expires', async () => {
+  const h=harness();h.client.createNote.mockRejectedValueOnce(new ApiFailure(0,true));
+  const task=await h.runner.enqueue(capture(),settings);await h.runner.start(task.id);
+  await h.runner.remove(task.id);h.tasks.get(task.id)!.hiddenAt=Date.now()-60_000;
+  expect((await h.runner.enqueue(capture(),settings)).id).toBe(task.id);
+  expect(h.tasks.get(task.id)?.hiddenAt).toBeUndefined();
+  expect(await h.runner.recreate(task.id,false)).toBe('not_found');
+  await h.runner.recreate(task.id,true);expect(h.tasks.size).toBe(2);
+});
+
+it('finishes interrupted successor cache copying before attempting any source downloads', async () => {
+  const h=idempotentHarness();const source=await h.runner.enqueue(imageCapture(),h.connection);
+  const original=h.tasks.get(source.id)!;original.status='uncertain';original.replacementId=crypto.randomUUID();
+  const next=await h.runner.enqueue(source.capture,h.connection,{id:original.replacementId,defaults:source.noteDefaults!});
+  for(let i=0;i<2;i++)await h.deps.store.putImage(source.id,i,new Blob(['cached'],{type:'image/png'}));
+  await h.deps.store.putImage(next.id,0,new Blob(['already copied'],{type:'image/png'}));
+  // Newest-first storage order must not start the successor before recovering its blobs.
+  h.deps.store.list=async()=>structuredClone([...h.tasks.values()].reverse());
+  vi.mocked(h.deps.download).mockRejectedValue(new Error('source gone'));
+  await new SaveRunner(h.deps).recover();
+  expect(h.tasks.get(next.id)?.status).toBe('saved');expect(h.deps.download).not.toHaveBeenCalled();
+});
+
+it('allows explicit recreation after unavailable reconciliation while preserving the original snapshot', async () => {
+  const h=harness();h.client.createNote.mockRejectedValueOnce(new ApiFailure(0,true));
+  const task=await h.runner.enqueue(capture(),settings);await h.runner.start(task.id);
+  h.client.findNotes.mockRejectedValue(new ApiFailure(200));
+  expect(await h.runner.recreate(task.id,false)).toBe('unavailable');
+  expect(h.client.createNote).toHaveBeenCalledTimes(1);
+  await h.runner.recreate(task.id,true);
+  expect(h.client.createNote).toHaveBeenCalledTimes(2);
+  expect(h.client.createNote.mock.calls[1]![0]).toEqual(task.capture);
+});
+
+it('preserves hidden successors during periodic recovery', async () => {
+  const h=idempotentHarness();const task=await h.runner.enqueue(capture(),h.connection);await h.runner.start(task.id);
+  await h.runner.recreate(task.id,true);const id=h.tasks.get(task.id)!.replacementId!;
+  await h.runner.remove(id);await h.runner.recover();expect(h.tasks.get(id)?.hiddenAt).toBeDefined();
+});
+
+it('restores predecessor blobs even when a successor starts directly before recovery', async () => {
+  const h=idempotentHarness();const source=await h.runner.enqueue(imageCapture(),h.connection);
+  const original=h.tasks.get(source.id)!;original.status='uncertain';original.replacementId=crypto.randomUUID();
+  const next=await h.runner.enqueue(source.capture,h.connection,{id:original.replacementId,defaults:source.noteDefaults!});
+  for(let i=0;i<2;i++)await h.deps.store.putImage(source.id,i,new Blob(['cached'],{type:'image/png'}));
+  vi.mocked(h.deps.download).mockRejectedValue(new Error('source gone'));
+  await h.runner.start(next.id);
+  expect(h.tasks.get(next.id)?.status).toBe('saved');expect(h.deps.download).not.toHaveBeenCalled();
+});

@@ -62,6 +62,7 @@ export function installBackground() {
   // adopt the protocol after a server upgrade without re-entering their key.
   const connectionReady = ready.then(async () => {
     const previous = await readSettings(); if (!previous) return;
+    if (previous.migrationFrom?.length) await runner.rebind(previous, previous);
     try {
       const connection = await new RoteClient(previous).connection();
       const current = await readSettings();
@@ -71,8 +72,9 @@ export function installBackground() {
       if (JSON.stringify(previous) !== JSON.stringify(updated)) resetPages();
     } catch { /* Keep the verified connection; normal task errors remain visible. */ }
   });
+  let connectionChanges: Promise<unknown> = connectionReady;
   const start = (id: string) => { void runner.start(id).catch(() => chrome.action.setBadgeText({ text: '!' })); };
-  installWebCapture(runner, start);
+  installWebCapture(runner, start, () => connectionChanges);
   async function handle(raw: unknown, sender: chrome.runtime.MessageSender): Promise<ResponseData> {
     await ready;
     if (sender.id !== chrome.runtime.id) throw new Error('not_allowed');
@@ -83,18 +85,24 @@ export function installBackground() {
       if (!trusted && (await chrome.tabs.get(sender.tab!.id!)).url !== request.url) throw new Error('not_allowed');
       return { capture: await remoteCapture(request) };
     }
+    if (!['settings:get','settings:save','open-settings'].includes(request.type)) await connectionChanges;
     const settings = await readSettings();
     if (request.type === 'open-settings') { await chrome.runtime.openOptionsPage(); return {}; }
     if (request.type === 'settings:get') return { settings };
     if (request.type === 'settings:save') {
-      if (!await chrome.permissions.contains({ origins: [originPattern(request.settings.apiUrl)] })) throw new Error('host_permission');
-      const connection = await new RoteClient(request.settings).connection();
-      const permissions = connection.permissions;
-      if (!['SENDROTE','UPLOADATTACHMENT','GETROTE'].every(permission => permissions.includes(permission))) throw new Error('missing_permissions');
-      const updated = await writeSettings(request.settings, { ownerId: connection.ownerId, noteCreateIdempotency: connection.capabilities?.noteCreateIdempotency === 1 ? 1 : undefined });
-      await runner.rebind(settings, updated); resetPages();
-      void runner.recover();
-      return { settings: updated, permissions };
+      const operation = connectionChanges.then(async () => {
+        const settings = await readSettings();
+        if (!await chrome.permissions.contains({ origins: [originPattern(request.settings.apiUrl)] })) throw new Error('host_permission');
+        const connection = await new RoteClient(request.settings).connection();
+        const permissions = connection.permissions;
+        if (!['SENDROTE','UPLOADATTACHMENT','GETROTE'].every(permission => permissions.includes(permission))) throw new Error('missing_permissions');
+        const updated = await writeSettings(request.settings, { ownerId: connection.ownerId, noteCreateIdempotency: connection.capabilities?.noteCreateIdempotency === 1 ? 1 : undefined });
+        await runner.rebind(settings, updated); resetPages();
+        void runner.recover();
+        return { settings: updated, permissions };
+      });
+      connectionChanges = operation.then(() => undefined, () => undefined);
+      return operation;
     }
     if (!settings) {
       if (request.type === 'status') return {};
@@ -138,7 +146,7 @@ export function installBackground() {
         : error instanceof Error && ['task_busy','task_changed','undo_expired','capture_removed','identity_mismatch','not_allowed','host_permission','missing_permissions','not_configured','invalid_address','tag_limit'].includes(error.message) ? error.message : 'save_failed' }));
     return true;
   });
-  const recover = () => { void connectionReady.then(() => runner.recover()).catch(() => chrome.action.setBadgeText({ text: '!' })); };
+  const recover = () => { void connectionChanges.then(() => runner.recover()).catch(() => chrome.action.setBadgeText({ text: '!' })); };
   chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === 'resume-captures') recover(); });
   chrome.runtime.onStartup.addListener(recover);
   chrome.runtime.onInstalled.addListener(() => { void chrome.alarms.create('resume-captures', { periodInMinutes: 0.5 }); });

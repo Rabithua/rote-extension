@@ -47,11 +47,19 @@ export class RoteClient {
     if (!parsed.success) throw new ApiFailure(201, true);
     return parsed.data;
   }
-  async getNote(id: string): Promise<RoteNote> { return noteSchema.parse(await this.call(`/notes/${encodeURIComponent(id)}`, 'GET')); }
+  async getNote(id: string): Promise<RoteNote> { return this.parseNote(await this.call(`/notes/${encodeURIComponent(id)}`, 'GET')); }
+  private parseNote(data: unknown): RoteNote {
+    const parsed = noteSchema.safeParse(data);
+    if (!parsed.success) throw new ApiFailure(200);
+    return parsed.data;
+  }
   async findNotes(sourceUrl: string, archived = false): Promise<RoteNote[]> {
     const notes: RoteNote[] = [];
     for (let skip = 0; skip < 2000; skip += 100) {
-      const page = z.array(noteSchema).parse(await this.call(`/notes/search?keyword=${encodeURIComponent(sourceUrl)}&limit=100&skip=${skip}&archived=${archived}`, 'GET'));
+      const data = await this.call(`/notes/search?keyword=${encodeURIComponent(sourceUrl)}&limit=100&skip=${skip}&archived=${archived}`, 'GET');
+      const parsed = z.array(noteSchema).safeParse(data);
+      if (!parsed.success) throw new ApiFailure(200);
+      const page = parsed.data;
       notes.push(...page);
       if (page.length < 100) return notes;
     }

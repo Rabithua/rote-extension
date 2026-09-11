@@ -11,7 +11,7 @@ export const settingsSchema = z.object({
   defaultArchived: z.boolean().default(false),
   defaultVisibility: z.enum(['private', 'public']).default('private'),
 });
-export const storedSettingsSchema = settingsSchema.extend({ id: z.string(), credentialId: z.string().optional(), ownerId: z.string().uuid().optional(), noteCreateIdempotency: z.literal(1).optional() });
+export const storedSettingsSchema = settingsSchema.extend({ id: z.string(), credentialId: z.string().optional(), migrationFrom: z.array(z.string()).optional(), ownerId: z.string().uuid().optional(), noteCreateIdempotency: z.literal(1).optional() });
 export type SettingsInput = z.input<typeof settingsSchema>;
 export type Settings = z.output<typeof storedSettingsSchema>;
 export function normalizeApiUrl(value: string): string {
@@ -34,7 +34,13 @@ export async function readSettings(): Promise<Settings | null> {
 }
 export async function writeSettings(input: SettingsInput, identity?: { ownerId?: string; noteCreateIdempotency?: 1 }): Promise<Settings> {
   const parsed = settingsSchema.parse(input);
-  const settings = { ...parsed, ...identity, credentialId: await configIdentity(parsed.apiUrl, parsed.openKey), id: await configIdentity(parsed.apiUrl, identity?.ownerId ?? parsed.openKey) };
+  const previous = await readSettings();
+  const ownerId = identity?.ownerId ?? (previous?.apiUrl === parsed.apiUrl && previous.openKey === parsed.openKey ? previous.ownerId : undefined);
+  const id = await configIdentity(parsed.apiUrl, ownerId ?? parsed.openKey);
+  const sameOwner = ownerId && previous?.apiUrl === parsed.apiUrl &&
+    (previous.ownerId ? previous.ownerId === ownerId : previous.openKey === parsed.openKey);
+  const migrationFrom = sameOwner ? [...new Set([...(previous.migrationFrom ?? []), ...(previous.id !== id ? [previous.id] : [])])] : [];
+  const settings = { ...parsed, ...identity, ownerId, credentialId: await configIdentity(parsed.apiUrl, parsed.openKey), id, migrationFrom };
   await protectStorage();
   await chrome.storage.local.set({ settings });
   return settings;

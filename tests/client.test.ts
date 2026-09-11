@@ -64,3 +64,10 @@ it('does not infer idempotency support when an older server only returns permiss
   const request=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({data:{permissions:['GETROTE']}})));
   expect(await new RoteClient(config,request).connection()).toEqual({permissions:['GETROTE']});
 });
+
+it('classifies malformed reconciliation notes as unavailable API results', async () => {
+  const request=vi.fn<typeof fetch>().mockImplementation(async()=>new Response(JSON.stringify({data:{id:'invalid',content:null}})));
+  const client=new RoteClient(config,request);
+  await expect(client.getNote(crypto.randomUUID())).rejects.toEqual(new ApiFailure(200));
+  await expect(client.findNotes('https://example.com/')).rejects.toEqual(new ApiFailure(200));
+});
