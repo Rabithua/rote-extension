@@ -16,6 +16,6 @@ export default defineContentScript({
     chrome.runtime.onMessage.addListener(listener);
     adapter.mount();
     ctx.onInvalidated(() => { bridge.reset(); adapter.dispose(); chrome.runtime.onMessage.removeListener(listener); });
-    ctx.addEventListener(window, 'wxt:locationchange', () => { bridge.reset(); adapter.dispose(); adapter.mount(); });
+    ctx.addEventListener(window, 'wxt:locationchange', () => { bridge.reset(); adapter.onLocationChange(); });
   },
 });

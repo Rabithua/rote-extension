@@ -21,10 +21,19 @@ export class GitHubAdapter implements SiteAdapter {
   private t(key: string) { return translate(languageFor('system', document.documentElement.lang), key); }
   mount() {
     this.observer = new MutationObserver(this.schedule);
-    this.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['content', 'hidden', 'class'] });
+    this.observer.observe(document.documentElement, {
+      childList: true, characterData: true, subtree: true, attributes: true,
+      attributeFilter: ['content', 'hidden', 'class', 'style', 'href', 'aria-label', 'data-testid', 'data-component', 'itemprop'],
+    });
     document.addEventListener('turbo:load', this.schedule);
     window.addEventListener('popstate', this.schedule);
     this.refresh();
+  }
+  onLocationChange() {
+    const button = this.button;
+    this.refresh();
+    // A delayed navigation notification must not replace an already-current, focused button.
+    if (button && this.button === button && this.sourceId) this.loadStatus(button, this.sourceId);
   }
   private schedule = () => {
     if (this.frame !== undefined) return;
@@ -35,7 +44,8 @@ export class GitHubAdapter implements SiteAdapter {
     const resolved = capture ? repositoryActions(capture.repository) : null;
     const actions = resolved?.container;
     if (!capture || !actions) { this.clear(); return; }
-    if (this.sourceId === capture.sourceId && this.wrapper?.parentElement === actions) return;
+    if (this.sourceId === capture.sourceId && this.wrapper?.parentElement === actions
+      && this.button?.isConnected && this.label?.isConnected) return;
     this.clear();
     const template = resolved?.template;
     if (!template) return;
@@ -65,7 +75,10 @@ export class GitHubAdapter implements SiteAdapter {
         this.toast.show(error instanceof Error ? error.message : 'save_failed', true);
       });
     });
-    void this.bridge.status(capture.sourceId).then(task => {
+    this.loadStatus(button, capture.sourceId);
+  }
+  private loadStatus(button: HTMLButtonElement, sourceId: string) {
+    void this.bridge.status(sourceId).then(task => {
       if (this.button === button && task && !this.busy) this.update(task);
     }).catch(() => undefined);
   }
