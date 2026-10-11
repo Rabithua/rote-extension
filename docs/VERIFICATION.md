@@ -207,4 +207,12 @@ The follow-up review also identified configurable About website links to another
 
 Five new regression assertions failed against the previous implementation, including both saved-note and pre-enqueue-error replies without a later task broadcast. All 24 targeted GitHub unit scenarios then passed with the fixes. Lint, typecheck, all 123 unit tests, the production build and the final full run of all 54 Chromium scenarios passed. Browser coverage holds the actual existing-note capture reply across a delayed location event, replaces the header before the sidebar with distinct old/new descriptions, and includes a configurable website link to another repository's activity page.
 
-Current public DiPlay, rote-extension, octocat.github.io (no description) and archived semantic HTML extracted the correct repository and description after removing the old public metadata offline. The production ZIP matches all 21 output files, has version 0.4.10, and excludes the disposable browser-test hooks and permissions. The user's installed extension was not reloaded or tested on the signed-in page this round; no live note or Chrome Web Store submission was made.
+Current public DiPlay, rote-extension, octocat.github.io (no description) and archived semantic HTML extracted the correct repository and description after removing the old public metadata offline. The production ZIP matches all 21 output files, has version 0.4.10, and excludes the disposable browser-test hooks and permissions. The user's installed extension was not reloaded or tested on the signed-in page this round; no live note was created.
+
+### Chrome Web Store submission
+
+On October 11, 2026, version 0.4.10 was uploaded to existing item cahpbdbfdfnmoachkjmcfgbbnmjcbpej. The package page confirmed draft 0.4.10 and published 0.4.8. Its ZIP SHA-256 is `2a09be204fadbe61da684a2608aedabf7d129c367569ab0bc5fa02437d96f55e`.
+
+The dashboard rejected the existing homepage `https://rote.ink` as inaccessible after repeated validation, although a local HTTP request returned 200. Changing only the listing homepage to the public extension project, `https://github.com/Rabithua/rote-extension`, passed validation. Existing descriptions, artwork, private testing instructions and privacy declarations were retained.
+
+The submission dialog had automatic publication after approval selected. The dashboard confirmed `已将您的扩展程序提交送审` and `状态：待审核`. This confirms submission; 0.4.10 is not yet approved or publicly released.
