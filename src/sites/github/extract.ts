@@ -2,11 +2,15 @@ import { githubCaptureSchema } from '../../domain/capture';
 
 const descriptionSelector = '[class*="SidebarAbout-module__description"], .f4.my-3';
 const aboutSelector = '[class*="SidebarSection-module__sidebarSection"], .BorderGrid-cell';
+const resourceIcons = 'svg.octicon-pulse, svg.octicon-repo-forked, svg.octicon-star, svg.octicon-eye';
 
 function repositoryDescription(doc: Document, repository: string, current: URL) {
   for (const section of doc.querySelectorAll(aboutSelector)) {
     const identities = new Set<string>();
     for (const link of section.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+      // Website and formatted-description links are configurable by the repository.
+      // Only GitHub's own resource/stat controls identify the rendered About body.
+      if (!link.querySelector(resourceIcons)) continue;
       try {
         const target = new URL(link.getAttribute('href')!, current);
         const match = target.pathname.match(/^\/([^/]+\/[^/]+)\/(?:activity|forks|stargazers|watchers)\/?$/);

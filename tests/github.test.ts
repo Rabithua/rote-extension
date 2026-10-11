@@ -9,7 +9,7 @@ function repositoryHeader(repository = 'Owner/Repo', visibility = 'Public') {
   return `<div><div itemprop="name"><strong><a data-testid="repo-name-link" href="/${repository}">${repository.split('/')[1]}</a></strong></div><span data-testid="repo-visibility-label" data-component="Label">${visibility}</span></div>`;
 }
 function repositoryAbout(repository = 'Owner/Repo', description = 'Useful project 🌱') {
-  return `<div class="SidebarSection-module__sidebarSection__test"><h2>About</h2><p class="SidebarAbout-module__description__test">${description}</p><a href="/${repository}/activity">Activity</a><a href="/${repository}/forks">Forks</a></div>`;
+  return `<div class="SidebarSection-module__sidebarSection__test"><h2>About</h2><p class="SidebarAbout-module__description__test">${description}</p><a href="/${repository}/activity"><svg class="octicon octicon-pulse"></svg>Activity</a><a href="/${repository}/forks"><svg class="octicon octicon-repo-forked"></svg>Forks</a></div>`;
 }
 describe('GitHub capture', () => {
   beforeEach(() => { document.head.innerHTML = '<meta name="octolytics-dimension-repository_nwo" content="Owner/Repo"><meta name="octolytics-dimension-repository_public" content="true">'; document.body.innerHTML = repositoryAbout(); });
@@ -102,6 +102,14 @@ describe('GitHub capture', () => {
     expect(extractRepository(document,url)?.text).toBe('');
     document.body.innerHTML = repositoryHeader() + repositoryAbout().replace('SidebarSection-module__sidebarSection__test','BorderGrid-cell').replace('SidebarAbout-module__description__test','f4 my-3');
     expect(extractRepository(document,url)?.text).toBe('Useful project 🌱');
+  });
+  it('ignores configurable website and description links to other repositories', () => {
+    document.body.innerHTML = repositoryHeader() + repositoryAbout('Owner/Repo','Current project <a href="/Other/Repo/watchers">related</a>');
+    const section = document.querySelector('[class*="SidebarSection-module__sidebarSection"]')!;
+    section.insertAdjacentHTML('afterbegin','<a href="https://github.com/Other/Repo/activity"><svg class="octicon octicon-link"></svg>Website</a>');
+    expect(extractRepository(document,url)?.text).toBe('Current project related');
+    section.querySelectorAll('a:has(.octicon-pulse), a:has(.octicon-repo-forked)').forEach(link => link.remove());
+    expect(extractRepository(document,url)).toBeNull();
   });
   it('does not bind descriptions to README, external or unrelated links', () => {
     for (const body of [

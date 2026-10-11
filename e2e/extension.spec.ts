@@ -15,10 +15,12 @@ const test=base.extend<{context:BrowserContext;extensionId:string}>({
       const add=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);
       chrome.contextMenus.onClicked.addListener=(fn)=>{globalThis.__roteMenus.push(fn);add(fn)};
       const addMessage=chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage);
-      chrome.runtime.onMessage.addListener=(fn)=>addMessage((message,sender,reply)=>fn(message,sender,response=>{
-        if(message.type==='capture' && globalThis.__roteHoldCapture) globalThis.__roteReleaseCapture=()=>reply(response);
-        else reply(response);
-      }));
+      chrome.runtime.onMessage.addListener=(fn)=>addMessage((message,sender,reply)=>{
+        return fn(message,sender,response=>{
+          if(message.type==='capture' && globalThis.__roteHoldCapture) globalThis.__roteReleaseCapture=()=>reply(response);
+          else reply(response);
+        });
+      });
     `+await readFile(bg,'utf8'));
     const path=join(extension,'manifest.json');const manifest=JSON.parse(await readFile(path,'utf8'));
     // This permission is added only to the disposable test copy, never to the deliverable.
@@ -344,7 +346,8 @@ test('GitHub can locate the action group from the reported Unwatch and Star butt
 
 test('GitHub uses header visibility without metadata and repairs removed button contents',async({context,extensionId})=>{
   await connect(context,extensionId);
-  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubHeaderFixture('Owner/Repo','Public',false)}));
+  const html=githubHeaderFixture('Owner/Repo','Public',false).replace('<h2>About</h2>','<h2>About</h2><a href="https://github.com/Other/Project/activity"><svg class="octicon octicon-link" width="16" height="16" aria-hidden="true"></svg>Website</a>');
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:html}));
   const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
   const button=page.locator('[data-rote-github] button');await expect(button).toBeVisible();
   expect((await button.boundingBox())!.height).toBe((await page.getByRole('button',{name:'Star Owner/Repo',exact:true}).boundingBox())!.height);

@@ -1,5 +1,5 @@
 export function githubAboutFixture(repository: string, description = '') {
-  return `<div class="SidebarSection-module__sidebarSection__test"><h2>About</h2>${description ? `<p class="SidebarAbout-module__description__test">${description}</p>` : ''}<a href="/${repository}/activity">Activity</a><a href="/${repository}/forks">Forks</a></div>`;
+  return `<div class="SidebarSection-module__sidebarSection__test"><h2>About</h2>${description ? `<p class="SidebarAbout-module__description__test">${description}</p>` : ''}<a href="/${repository}/activity"><svg class="octicon octicon-pulse" width="16" height="16" aria-hidden="true"></svg>Activity</a><a href="/${repository}/forks"><svg class="octicon octicon-repo-forked" width="16" height="16" aria-hidden="true"></svg>Forks</a></div>`;
 }
 
 export function githubFixture(repository = 'Owner/Repo', isPublic = true, description = 'A useful project', dark = false) {
