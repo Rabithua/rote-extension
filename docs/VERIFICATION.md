@@ -196,3 +196,13 @@ The adapter observes text, link and visibility changes and restores removed butt
 On October 11, 2026, lint, typecheck, all 115 unit tests, the production build and all 53 Chromium scenarios passed. Coverage includes current and legacy headers, absent metadata, stale identities, private visibility, header changes, keyboard focus, responsive action visibility, button restoration and corner clicks. Current public DiPlay and rote-extension HTML also extracted correctly after removing the old public metadata offline.
 
 The unpacked extension was reloaded to 0.4.9 before the final focus adjustment. Computer-use access was denied during tab switching, so the final user's-page check could not be completed. The final build and ZIP are available locally; no live note or Chrome Web Store submission was made.
+
+## 0.4.10 GitHub navigation review fixes
+
+Review of #10 found that delayed location events could discard a pending save reply while retaining a disabled button, and that a destination header could be combined with the previous repository's description.
+
+GitHub location events now refresh the DOM without resetting the bridge or querying over an active save; connection changes still reset and remount. Descriptions are read from modern/legacy About sections whose repository-owned activity/fork/star/watch links agree with the current repository. Capture waits while the old sidebar remains or its links disagree. This uses current body identity without timers or additional network requests.
+
+Five new regression assertions failed against the previous implementation, including both saved-note and pre-enqueue-error replies without a later task broadcast. All 23 targeted GitHub unit scenarios then passed with the fixes. Lint, typecheck, all 122 unit tests, the production build and the final full run of all 54 Chromium scenarios passed. Browser coverage holds the actual existing-note capture reply across a delayed location event and replaces the header before the sidebar with distinct old/new descriptions.
+
+Current public DiPlay and rote-extension HTML extracted the correct repository and description after removing the old public metadata offline. The production ZIP matches all 21 output files, has version 0.4.10, and excludes the disposable browser-test hooks and permissions. The user's installed extension was not reloaded or tested on the signed-in page this round; no live note or Chrome Web Store submission was made.
