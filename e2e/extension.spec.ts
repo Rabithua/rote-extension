@@ -4,13 +4,24 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { xFixture } from './x-fixture';
 import { youtubeFixture } from './youtube-fixture';
-import { githubFixture, githubHeaderFixture } from './github-fixture';
+import { githubAboutFixture, githubFixture, githubHeaderFixture } from './github-fixture';
 
 const test=base.extend<{context:BrowserContext;extensionId:string}>({
   context:async ({playwright},use)=>{
     const folder=await mkdtemp(join(tmpdir(),'rote-extension-e2e-'));
     const extension=join(folder,'extension');await cp(resolve('.output/chrome-mv3'),extension,{recursive:true});
-    const bg=join(extension,'background.js'); await writeFile(bg, `globalThis.__roteMenus=[];const add=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);chrome.contextMenus.onClicked.addListener=(fn)=>{globalThis.__roteMenus.push(fn);add(fn)};`+await readFile(bg,'utf8'));
+    const bg=join(extension,'background.js'); await writeFile(bg, `
+      globalThis.__roteMenus=[];
+      const add=chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);
+      chrome.contextMenus.onClicked.addListener=(fn)=>{globalThis.__roteMenus.push(fn);add(fn)};
+      const addMessage=chrome.runtime.onMessage.addListener.bind(chrome.runtime.onMessage);
+      chrome.runtime.onMessage.addListener=(fn)=>addMessage((message,sender,reply)=>{
+        return fn(message,sender,response=>{
+          if(message.type==='capture' && globalThis.__roteHoldCapture) globalThis.__roteReleaseCapture=()=>reply(response);
+          else reply(response);
+        });
+      });
+    `+await readFile(bg,'utf8'));
     const path=join(extension,'manifest.json');const manifest=JSON.parse(await readFile(path,'utf8'));
     // This permission is added only to the disposable test copy, never to the deliverable.
     manifest.host_permissions.push('http://127.0.0.1/*','https://example.com/*');await writeFile(path,JSON.stringify(manifest));
@@ -230,13 +241,14 @@ test('GitHub saves summary with tags, deduplicates and follows repository naviga
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].content).toBe('Owner/Repo\n\nA useful project\n\nhttps://github.com/Owner/Repo');expect(state.data.notes[0].tags).toEqual(['GitHub']);
   await page.reload();await expect(button).toHaveText('View note');
-  await page.evaluate(()=>{
+  await page.evaluate(about=>{
     history.pushState({},'', '/Other/Project');
     document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Project');
+    document.querySelector('[class*="SidebarSection-module__sidebarSection"]')!.outerHTML=about;
     const actions=document.querySelector('.pagehead-actions')!;actions.replaceWith(actions.cloneNode(true));
     document.querySelector('[data-rote-github]')?.remove();
     document.dispatchEvent(new Event('turbo:load'));
-  });
+  },githubAboutFixture('Other/Project','Destination project'));
   await expect(button).toHaveCount(1);await expect(button).toHaveText('Save to Rote');
   await page.evaluate(()=>{history.pushState({},'', '/Other/Project/issues');document.dispatchEvent(new Event('turbo:load'));});
   await expect(button).toHaveCount(0);
@@ -285,7 +297,7 @@ test('GitHub dark Chinese button supports keyboard and bottom corner clicks at z
   const box=await button.boundingBox();if(!box)throw Error('missing button');
   // Four pixels inward is inside the visible rounded corner at 125% zoom.
   await page.mouse.click(box.x+box.width-4,box.y+box.height-4);await expect(button).toHaveText('查看笔记');
-  await page.evaluate(()=>{history.pushState({},'', '/Other/Repo');document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Repo');document.dispatchEvent(new Event('turbo:load'));});
+  await page.evaluate(about=>{history.pushState({},'', '/Other/Repo');document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Repo');document.querySelector('[class*="SidebarSection-module__sidebarSection"]')!.outerHTML=about;document.dispatchEvent(new Event('turbo:load'));},githubAboutFixture('Other/Repo','Destination project'));
   await expect(button).toHaveText('保存到 Rote');await button.focus();await page.keyboard.press('Enter');await expect(button).toHaveText('查看笔记');
 });
 
@@ -334,7 +346,8 @@ test('GitHub can locate the action group from the reported Unwatch and Star butt
 
 test('GitHub uses header visibility without metadata and repairs removed button contents',async({context,extensionId})=>{
   await connect(context,extensionId);
-  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubHeaderFixture('Owner/Repo','Public',false)}));
+  const html=githubHeaderFixture('Owner/Repo','Public',false).replace('<h2>About</h2>','<h2>About</h2><a href="https://github.com/Other/Project/activity"><svg class="octicon octicon-link" width="16" height="16" aria-hidden="true"></svg>Website</a>');
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:html}));
   const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
   const button=page.locator('[data-rote-github] button');await expect(button).toBeVisible();
   expect((await button.boundingBox())!.height).toBe((await page.getByRole('button',{name:'Star Owner/Repo',exact:true}).boundingBox())!.height);
@@ -365,6 +378,9 @@ test('GitHub follows semantic header navigation and live visibility changes with
     document.querySelector('a[href$="/fork"]')!.setAttribute('href','/Next/Project/fork');
     document.querySelector('button[aria-label^="Star"]')!.setAttribute('aria-label','Star Next/Project');
   });
+  // The header/actions are current, but the old About body must not be saved.
+  await expect(button).toHaveCount(0);
+  await page.evaluate(about=>{document.querySelector('[class*="SidebarSection-module__sidebarSection"]')!.outerHTML=about;},githubAboutFixture('Next/Project','Destination project'));
   await expect(button).toHaveText('Save to Rote');
   await button.focus();
   await page.evaluate(()=>window.dispatchEvent(new Event('wxt:locationchange')));
@@ -380,10 +396,26 @@ test('GitHub follows semantic header navigation and live visibility changes with
   await expect(button).toHaveText('View note');
   const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
   expect(state.data.notes).toHaveLength(1);
-  expect(state.data.notes[0].content).toBe('Next/Project\n\nA useful project\n\nhttps://github.com/Next/Project');
+  expect(state.data.notes[0].content).toBe('Next/Project\n\nDestination project\n\nhttps://github.com/Next/Project');
   await page.evaluate(()=>history.pushState({},'', '/Next/Project/issues'));
   await expect(button).toHaveCount(0);
   await page.goBack();await expect(button).toHaveText('View note');
+});
+
+test('GitHub settles opening an existing note after a delayed location event without a broadcast',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubHeaderFixture()}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  const button=page.locator('[data-rote-github] button');await button.click();await expect(button).toHaveText('View note');
+  const worker=context.serviceWorkers()[0]!;
+  await worker.evaluate(()=>{(globalThis as unknown as {__roteHoldCapture:boolean}).__roteHoldCapture=true;});
+  await button.click();await expect(button).toBeDisabled();
+  await expect.poll(()=>worker.evaluate(()=>typeof (globalThis as unknown as {__roteReleaseCapture?:()=>void}).__roteReleaseCapture)).toBe('function');
+  await page.evaluate(()=>window.dispatchEvent(new Event('wxt:locationchange')));
+  await worker.evaluate(()=>{(globalThis as unknown as {__roteReleaseCapture:()=>void}).__roteReleaseCapture();});
+  await expect(button).toHaveText('View note');await expect(button).toBeEnabled();
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
+  expect(state.data.notes).toHaveLength(1);
 });
 
 test('X and GitHub share Rote toast styling, success dismissal and recovery controls',async({context,extensionId})=>{
@@ -405,7 +437,7 @@ test('X and GitHub share Rote toast styling, success dismissal and recovery cont
   await mkdir('test-results/visuals',{recursive:true});await github.screenshot({path:'test-results/visuals/shared-toast-dark.png'});
   await expect(toast).toHaveCount(0,{timeout:8000});
   await github.reload();await expect(github.locator('[data-rote-github] button')).toHaveText('View note');await expect(toast).toHaveCount(0);
-  await github.evaluate(()=>{history.pushState({},'', '/Other/Repo');document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Repo');document.dispatchEvent(new Event('turbo:load'));});
+  await github.evaluate(about=>{history.pushState({},'', '/Other/Repo');document.querySelector('meta[name$="_nwo"]')!.setAttribute('content','Other/Repo');document.querySelector('[class*="SidebarSection-module__sidebarSection"]')!.outerHTML=about;document.dispatchEvent(new Event('turbo:load'));},githubAboutFixture('Other/Repo','Destination project'));
   await expect(github.locator('[data-rote-github] button')).toHaveText('Save to Rote');
   await context.request.post('http://127.0.0.1:43119/__fail',{data:{failure:'create403'}});
   await github.locator('[data-rote-github] button').click();await expect(toast.getByRole('button',{name:'Open settings'})).toBeVisible();

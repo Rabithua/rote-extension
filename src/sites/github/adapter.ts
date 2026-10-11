@@ -30,10 +30,7 @@ export class GitHubAdapter implements SiteAdapter {
     this.refresh();
   }
   onLocationChange() {
-    const button = this.button;
     this.refresh();
-    // A delayed navigation notification must not replace an already-current, focused button.
-    if (button && this.button === button && this.sourceId) this.loadStatus(button, this.sourceId);
   }
   private schedule = () => {
     if (this.frame !== undefined) return;

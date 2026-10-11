@@ -16,6 +16,8 @@ export default defineContentScript({
     chrome.runtime.onMessage.addListener(listener);
     adapter.mount();
     ctx.onInvalidated(() => { bridge.reset(); adapter.dispose(); chrome.runtime.onMessage.removeListener(listener); });
-    ctx.addEventListener(window, 'wxt:locationchange', () => { bridge.reset(); adapter.onLocationChange(); });
+    // The adapter checks the current repository before applying responses. A delayed
+    // location event must not invalidate a save already started on the current page.
+    ctx.addEventListener(window, 'wxt:locationchange', () => adapter.onLocationChange());
   },
 });
