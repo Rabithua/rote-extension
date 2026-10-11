@@ -4,7 +4,7 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { xFixture } from './x-fixture';
 import { youtubeFixture } from './youtube-fixture';
-import { githubFixture } from './github-fixture';
+import { githubFixture, githubHeaderFixture } from './github-fixture';
 
 const test=base.extend<{context:BrowserContext;extensionId:string}>({
   context:async ({playwright},use)=>{
@@ -330,6 +330,60 @@ test('GitHub can locate the action group from the reported Unwatch and Star butt
   const button=page.locator('.repo-toolbar [data-rote-github] button');await expect(button).toBeVisible();
   await expect(page.locator('[data-rote-github]')).toHaveCount(1);
   await button.click();await expect(button).toHaveText('View note');
+});
+
+test('GitHub uses header visibility without metadata and repairs removed button contents',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:githubHeaderFixture('Owner/Repo','Public',false)}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  const button=page.locator('[data-rote-github] button');await expect(button).toBeVisible();
+  expect((await button.boundingBox())!.height).toBe((await page.getByRole('button',{name:'Star Owner/Repo',exact:true}).boundingBox())!.height);
+  await page.evaluate(()=>document.querySelector('[data-rote-github]')!.replaceChildren());
+  await expect(button).toHaveCount(1);await expect(button).toBeVisible();
+  await page.evaluate(()=>{(document.querySelector('.generated-actions') as HTMLElement).style.display='none';});
+  await expect(button).toHaveCount(0);
+  await page.evaluate(()=>{(document.querySelector('.generated-actions') as HTMLElement).style.display='flex';});
+  await expect(button).toBeVisible();
+  await button.click({position:{x:2,y:2}});await expect(button).toHaveText('View note');
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
+  expect(state.data.notes).toHaveLength(1);
+  expect(state.data.notes[0].content).toBe('Owner/Repo\n\nA useful project\n\nhttps://github.com/Owner/Repo');
+});
+
+test('GitHub follows semantic header navigation and live visibility changes with stale metadata',async({context,extensionId})=>{
+  await connect(context,extensionId);
+  // Keep the previous repository's private metadata while the rendered header changes.
+  const html=githubHeaderFixture().replace('</head>','<meta name="octolytics-dimension-repository_public" content="false"></head>');
+  await context.route('https://github.com/**',route=>route.fulfill({contentType:'text/html',body:html}));
+  const page=await context.newPage();await page.goto('https://github.com/Owner/Repo');
+  const button=page.locator('[data-rote-github] button');await expect(button).toHaveCount(0);
+  await page.evaluate(()=>history.pushState({},'', '/Next/Project'));
+  await expect(button).toHaveCount(0);
+  await page.evaluate(()=>{
+    document.querySelector('[data-testid="repo-name-link"]')!.setAttribute('href','/Next/Project');
+    document.querySelector('[data-testid="repo-name-link"]')!.textContent='Project';
+    document.querySelector('a[href$="/fork"]')!.setAttribute('href','/Next/Project/fork');
+    document.querySelector('button[aria-label^="Star"]')!.setAttribute('aria-label','Star Next/Project');
+  });
+  await expect(button).toHaveText('Save to Rote');
+  await button.focus();
+  await page.evaluate(()=>window.dispatchEvent(new Event('wxt:locationchange')));
+  await expect(button).toBeFocused();
+  await page.keyboard.press('Enter');await expect(button).toHaveText('View note');
+  await page.evaluate(()=>{document.querySelector('[data-testid="repo-visibility-label"]')!.firstChild!.nodeValue='Private';});
+  await expect(button).toHaveCount(0);
+  await page.evaluate(()=>{
+    document.querySelector('[data-testid="repo-visibility-label"]')!.firstChild!.nodeValue='Public';
+    document.querySelectorAll('[data-testid]').forEach(element=>element.removeAttribute('data-testid'));
+  });
+  await expect(button).toBeVisible();
+  await expect(button).toHaveText('View note');
+  const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();
+  expect(state.data.notes).toHaveLength(1);
+  expect(state.data.notes[0].content).toBe('Next/Project\n\nA useful project\n\nhttps://github.com/Next/Project');
+  await page.evaluate(()=>history.pushState({},'', '/Next/Project/issues'));
+  await expect(button).toHaveCount(0);
+  await page.goBack();await expect(button).toHaveText('View note');
 });
 
 test('X and GitHub share Rote toast styling, success dismissal and recovery controls',async({context,extensionId})=>{

@@ -186,3 +186,13 @@ Lint, typecheck, 54 unit tests, production build and all five Bilibili Chromium 
 Shared Shadow DOM feedback now uses 6px vertical and 14px horizontal padding, a capsule radius and a subtle spring entrance (360ms transform, 180ms fade). Exit fades and shifts down before removal. Status changes update in place, a new capture can interrupt an exit, and reduced-motion mode skips transitions. Host-page styles remain isolated.
 
 Lint, typecheck, 57 unit tests and the production build passed. The browser suite passed its existing 40 scenarios; the new reduced-motion corner test initially clicked outside the circular close surface, then passed after targeting its visible edge. All three targeted toast scenarios passed, including a second new entrance/exit test (42 distinct browser scenarios covered in total). Light/dark, compact success, narrow recovery and a 10%-speed entrance screenshot were inspected. This validation uses Chromium fixtures; no live note or Chrome Web Store submission was made for this change.
+
+## 0.4.9 GitHub repository header compatibility
+
+The user's signed-in DiPlay page exposed the repository identity and a Public header label but omitted the old public metadata, causing extraction to stop before button insertion. Repository detection now checks the rendered title link and its scoped visibility label, with legacy metadata support. It validates the identity against the current URL and excludes private/internal or unconfirmed visibility. Semantic header markup also works without generated classes or test IDs.
+
+The adapter observes text, link and visibility changes and restores removed button contents. Delayed location notifications refresh task status without replacing an already-current button or losing keyboard focus. Native button dimensions and styling are unchanged.
+
+On October 11, 2026, lint, typecheck, all 115 unit tests, the production build and all 53 Chromium scenarios passed. Coverage includes current and legacy headers, absent metadata, stale identities, private visibility, header changes, keyboard focus, responsive action visibility, button restoration and corner clicks. Current public DiPlay and rote-extension HTML also extracted correctly after removing the old public metadata offline.
+
+The unpacked extension was reloaded to 0.4.9 before the final focus adjustment. Computer-use access was denied during tab switching, so the final user's-page check could not be completed. The final build and ZIP are available locally; no live note or Chrome Web Store submission was made.
