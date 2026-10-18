@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { xFixture } from './x-fixture';
 import { youtubeFixture } from './youtube-fixture';
 import { githubAboutFixture, githubFixture, githubHeaderFixture } from './github-fixture';
+import { bilibiliHydrationFixture } from './bilibili-fixture';
 
 const test=base.extend<{context:BrowserContext;extensionId:string}>({
   context:async ({playwright},use)=>{
@@ -638,6 +639,176 @@ test('Bilibili leaves server-rendered DOM intact until hydration completes',asyn
   await page.locator('#app').evaluate(el=>el.removeAttribute('data-server-rendered'));
   await expect(button).toHaveCount(1);await expect(button).toBeEnabled();
   await expect(page.locator('#biliMainHeader a')).toBeVisible();
+});
+
+for (const serverMarker of [false, true]) {
+  test(`Bilibili preserves native nodes during delayed Vue hydration (${serverMarker ? 'marker removed early' : 'no server marker'})`, async ({context, extensionId}) => {
+    await connect(context, extensionId); await mockPageAPIs(context);
+    const runtime = await readFile(resolve('node_modules/vue/dist/vue.runtime.js'), 'utf8');
+    await context.route('https://www.bilibili.com/**', route => route.fulfill({
+      contentType: route.request().url().endsWith('/__fixture_vue.js') ? 'application/javascript' : 'text/html',
+      body: route.request().url().endsWith('/__fixture_vue.js') ? runtime : bilibiliHydrationFixture(serverMarker),
+    }));
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (['error', 'warning'].includes(message.type())) errors.push(message.text()); });
+    await page.goto('https://www.bilibili.com/video/BV1234567890');
+    const app = await page.locator('#app').elementHandle();
+    const header = await page.locator('#biliMainHeader').elementHandle();
+    const share = await page.locator('.video-share').elementHandle();
+    if (serverMarker) {
+      await expect(page.locator('[data-rote-page=bilibili]')).toHaveCount(0);
+      await page.locator('#app').evaluate(element => element.removeAttribute('data-server-rendered'));
+      await page.evaluate(() => { (window as unknown as {biliNativeMutations: string[]}).biliNativeMutations.length = 0; });
+    }
+    const button = page.locator('[data-rote-page=bilibili]');
+    await expect(button).toBeVisible();
+    // The native app is still waiting for its client bundle. The extension must
+    // leave its child list intact even when no SSR marker protects that tree.
+    await page.evaluate(() => { (window as unknown as {biliHydrate: () => void}).biliHydrate(); });
+    expect(await page.evaluate(element => element === document.querySelector('#app'), app)).toBe(true);
+    expect(await page.evaluate(element => element === document.querySelector('#biliMainHeader'), header)).toBe(true);
+    expect(await page.evaluate(element => element === document.querySelector('.video-share'), share)).toBe(true);
+    await expect(page.locator('#biliMainHeader')).toHaveCount(1);
+    await expect(page.locator('#biliMainHeader a')).toBeVisible();
+    await expect(button).toHaveCount(1);
+    await expect(button).toBeVisible();
+    expect(errors).toEqual([]);
+    expect(await page.evaluate(() => (window as unknown as {biliNativeMutations: string[]}).biliNativeMutations)).toEqual([]);
+    await button.click(); await expect(button).toHaveText('View note');
+    expect(await page.evaluate(() => (window as unknown as {biliNativeMutations: string[]}).biliNativeMutations)).toEqual([]);
+  });
+}
+
+test('Bilibili portal follows native layout and yields when toolbar space is occupied', async ({context, extensionId}) => {
+  await connect(context, extensionId); await mockPageAPIs(context);
+  const runtime = await readFile(resolve('node_modules/vue/dist/vue.runtime.js'), 'utf8');
+  await context.route('https://www.bilibili.com/**', route => route.fulfill({
+    contentType: route.request().url().endsWith('/__fixture_vue.js') ? 'application/javascript' : 'text/html',
+    body: route.request().url().endsWith('/__fixture_vue.js') ? runtime : bilibiliHydrationFixture(),
+  }));
+  const page = await context.newPage();
+  await page.goto('https://www.bilibili.com/video/BV1234567890');
+  const button = page.locator('[data-rote-page=bilibili]');
+  const host = page.locator('html > [data-rote-bilibili-host]');
+  await expect(button).toBeVisible(); await expect(host).toHaveCount(1);
+  expect(await button.evaluate(element => element.getRootNode() instanceof ShadowRoot)).toBe(true);
+  async function expectAligned() {
+    await expect.poll(async () => {
+      const native = await page.locator('.video-share').boundingBox();
+      const saved = await button.boundingBox();
+      return !!native && !!saved && saved.x >= native.x + native.width
+        && Math.abs(saved.y + saved.height / 2 - native.y - native.height / 2) < 1;
+    }).toBe(true);
+  }
+  await expectAligned();
+  const initial = (await button.boundingBox())!;
+  // A narrow native action between the portal's sample points must still win.
+  await page.locator('.video-toolbar').evaluate((element, bounds) => {
+    const obstacle = document.createElement('button'); obstacle.dataset.biliFixtureObstacle = '';
+    obstacle.textContent = 'X'; obstacle.style.cssText = `position:fixed;left:${bounds.x + bounds.width / 4}px;top:${bounds.y}px;width:8px;height:${bounds.height}px;padding:0;border:0;overflow:hidden`;
+    element.append(obstacle);
+  }, initial);
+  await expect(button).toBeHidden(); await expect(page.locator('[data-bili-fixture-obstacle]')).toBeVisible();
+  await page.locator('[data-bili-fixture-obstacle]').evaluate(element => element.remove()); await expect(button).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 160));
+  await expectAligned();
+  await expect.poll(async () => Math.round((await button.boundingBox())!.y)).toBe(Math.round(initial.y - 160));
+  await page.setViewportSize({width: 880, height: 650}); await expectAligned();
+  await page.locator('body').evaluate(element => { element.style.zoom = '1.25'; }); await expectAligned();
+  await button.evaluate(element => element.addEventListener('click', event => {
+    event.stopImmediatePropagation();
+    const scope = window as unknown as {biliCornerClicks?: number}; scope.biliCornerClicks = (scope.biliCornerClicks ?? 0) + 1;
+  }, true));
+  const zoomed = (await button.boundingBox())!;
+  for (const position of [{x:2,y:2}, {x:zoomed.width-2,y:2}, {x:2,y:zoomed.height-2}, {x:zoomed.width-2,y:zoomed.height-2}]) await button.click({position});
+  expect(await page.evaluate(() => (window as unknown as {biliCornerClicks: number}).biliCornerClicks)).toBe(4);
+  await page.locator('body').evaluate(element => { element.style.zoom = ''; }); await expectAligned();
+  await page.locator('.video-space').evaluate(element => { (element as HTMLElement).style.height = '360px'; });
+  await expectAligned();
+  await page.setViewportSize({width: 360, height: 600});
+  await page.locator('.video-toolbar-right').evaluate(element => { (element as HTMLElement).style.width = '160px'; });
+  await expect(button).toBeHidden();
+  await expect(page.locator('.video-share')).toBeVisible();
+  await expect(page.locator('.video-toolbar-right')).toBeVisible();
+  await page.setViewportSize({width: 1100, height: 850}); await expect(button).toBeVisible(); await expectAligned();
+  // An invisible or removed native action must never leave an orphaned overlay.
+  await page.locator('.video-toolbar-left').evaluate(element => { (element as HTMLElement).style.display = 'none'; });
+  await expect(button).toBeHidden();
+  await page.locator('.video-toolbar-left').evaluate(element => { (element as HTMLElement).style.display = ''; });
+  await expect(button).toBeVisible(); await expectAligned();
+});
+
+test('Bilibili replaces its portal when native toolbar rebuilds and removes it off the video route', async ({context, extensionId}) => {
+  await connect(context, extensionId); await mockPageAPIs(context);
+  const runtime = await readFile(resolve('node_modules/vue/dist/vue.runtime.js'), 'utf8');
+  await context.route('https://www.bilibili.com/**', route => route.fulfill({
+    contentType: route.request().url().endsWith('/__fixture_vue.js') ? 'application/javascript' : 'text/html',
+    body: route.request().url().endsWith('/__fixture_vue.js') ? runtime : bilibiliHydrationFixture(),
+  }));
+  const page = await context.newPage();
+  await page.goto('https://www.bilibili.com/video/BV1234567890');
+  const button = page.locator('[data-rote-page=bilibili]');
+  const host = page.locator('html > [data-rote-bilibili-host]');
+  await expect(button).toBeVisible(); const firstHost = await host.elementHandle();
+  await button.click(); await expect(button).toHaveText('View note');
+  await page.locator('.video-toolbar-left').evaluate(element => { element.replaceWith(element.cloneNode(true)); });
+  await expect(button).toHaveCount(1); await expect(button).toBeVisible(); await expect(button).toHaveText('View note');
+  await expect.poll(() => page.evaluate(element => element!.isConnected, firstHost)).toBe(false);
+  await expect(host).toHaveCount(1);
+  await page.evaluate(() => {
+    history.pushState({}, '', '/video/BV1234567891');
+    const app = document.querySelector('#app')!;
+    app.replaceWith(app.cloneNode(true));
+  });
+  await expect(button).toHaveCount(1); await expect(button).toBeVisible(); await expect(button).toBeEnabled();
+  await expect(button).toHaveText('Save to Rote');
+  await expect(page.locator('#biliMainHeader')).toHaveCount(1); await expect(page.locator('#biliMainHeader a')).toBeVisible();
+  await page.evaluate(() => {
+    const scope = window as unknown as {biliNativeMutations: string[]}; scope.biliNativeMutations = [];
+    new MutationObserver(records => scope.biliNativeMutations.push(...records.map(record => record.type))).observe(document.querySelector('#app')!, {subtree:true, childList:true, attributes:true, characterData:true});
+    history.pushState({}, '', '/');
+  });
+  await expect(host).toHaveCount(0); await expect(button).toHaveCount(0);
+  await page.setViewportSize({width: 700, height: 600}); await page.evaluate(() => window.scrollTo(0, 180));
+  expect(await page.evaluate(() => (window as unknown as {biliNativeMutations: string[]}).biliNativeMutations)).toEqual([]);
+  await expect(page.locator('#biliMainHeader a')).toBeVisible();
+});
+
+test('Bilibili portal keeps forward and backward toolbar focus order across saving', async ({context, extensionId}) => {
+  await connect(context, extensionId); await mockPageAPIs(context);
+  const runtime = await readFile(resolve('node_modules/vue/dist/vue.runtime.js'), 'utf8');
+  await context.route('https://www.bilibili.com/**', route => route.fulfill({
+    contentType: route.request().url().endsWith('/__fixture_vue.js') ? 'application/javascript' : 'text/html',
+    body: route.request().url().endsWith('/__fixture_vue.js') ? runtime : bilibiliHydrationFixture(),
+  }));
+  const page = await context.newPage(); await page.goto('https://www.bilibili.com/video/BV1234567890');
+  const button = page.locator('[data-rote-page=bilibili]'); const share = page.locator('.video-share'); const report = page.locator('.video-toolbar-right');
+  await expect(button).toBeVisible();
+  async function expectToolbarOrder() {
+    await share.focus(); await page.keyboard.press('Tab'); await expect(button).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(report).toBeFocused();
+    await page.keyboard.press('Shift+Tab'); await expect(button).toBeFocused();
+    await page.keyboard.press('Shift+Tab'); await expect(share).toBeFocused();
+  }
+  await expectToolbarOrder();
+  const worker = context.serviceWorkers()[0]!;
+  await worker.evaluate(() => {
+    const native = globalThis.fetch;
+    globalThis.fetch = (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.endsWith('/notes') && init?.method === 'POST') return new Promise<Response>(resolve => {
+        (globalThis as unknown as {biliReleaseCreate: () => void}).biliReleaseCreate = () => resolve(native(input, init));
+      });
+      return native(input, init);
+    };
+  });
+  await button.click(); await expect(button).toBeDisabled();
+  await expect.poll(() => worker.evaluate(() => typeof (globalThis as unknown as {biliReleaseCreate?: () => void}).biliReleaseCreate)).toBe('function');
+  await share.focus(); await page.keyboard.press('Tab'); await expect(report).toBeFocused();
+  await worker.evaluate(() => { (globalThis as unknown as {biliReleaseCreate: () => void}).biliReleaseCreate(); });
+  await expect(button).toHaveText('View note'); await expect(button).toBeEnabled(); await expectToolbarOrder();
 });
 
 test('Bilibili button follows native hover colors and keeps saved results actionable',async({context,extensionId})=>{
