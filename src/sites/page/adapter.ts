@@ -6,13 +6,21 @@ import { CaptureToast } from '../toast';
 
 type PageCapture = Exclude<CaptureItem, { site: 'x' | 'github' | 'youtube' | 'web' }>;
 
+export interface MountedPageButton {
+  button: HTMLButtonElement;
+  root: HTMLElement;
+  isValid?(): boolean;
+  refresh?(): void;
+  dispose?(): void;
+}
+
 export interface PageDefinition {
   site: PageCapture['site'];
   sourceId(url: string): string | null;
   closeMenu?(): void;
   isMountedValid?(): boolean;
   extract(): PageCapture | null | Promise<PageCapture | null>;
-  mountButton(label: string): { button: HTMLButtonElement; root: HTMLElement } | null;
+  mountButton(label: string): MountedPageButton | null;
 }
 
 export class PageAdapter implements SiteAdapter {
@@ -20,6 +28,7 @@ export class PageAdapter implements SiteAdapter {
   private observer?: MutationObserver;
   private frame?: number;
   private root?: HTMLElement;
+  private mounted?: MountedPageButton;
   private button?: HTMLButtonElement;
   private label?: HTMLElement;
   private sourceId?: string;
@@ -51,12 +60,15 @@ export class PageAdapter implements SiteAdapter {
   private refresh() {
     const sourceId = this.definition.sourceId(location.href);
     if (!sourceId) { this.clear(); return; }
-    if (sourceId === this.routeId && this.root?.isConnected && (this.definition.isMountedValid?.() ?? true)) return;
+    if (sourceId === this.routeId && this.root?.isConnected && (this.mounted?.isValid?.() ?? true) && (this.definition.isMountedValid?.() ?? true)) {
+      this.mounted?.refresh?.();
+      return;
+    }
     if (sourceId !== this.routeId) { this.clear(); this.routeId = sourceId; this.sourceId = sourceId; }
-    this.root?.remove(); this.root = undefined; this.button = undefined; this.label = undefined;
+    this.unmountButton();
     const mounted = this.definition.mountButton(this.t('save'));
     if (!mounted) return;
-    this.root = mounted.root; this.button = mounted.button;
+    this.mounted = mounted; this.root = mounted.root; this.button = mounted.button;
     this.label = mounted.button.querySelector('[data-rote-label]') ?? undefined;
     this.sourceId = this.tasks.get(sourceId)?.sourceId ?? sourceId; this.routeId = sourceId;
     if (this.busy) this.render('saving');
@@ -108,9 +120,14 @@ export class PageAdapter implements SiteAdapter {
     if (task.sourceId === this.watchedSource) this.toast.showTask(task);
   }
 
+  private unmountButton() {
+    this.mounted?.dispose?.(); this.root?.remove();
+    this.mounted = undefined; this.root = undefined; this.button = undefined; this.label = undefined;
+  }
+
   private clear() {
-    this.root?.remove(); this.toast.hide(); this.root = undefined; this.button = undefined;
-    this.label = undefined; this.sourceId = undefined; this.routeId = undefined; this.watchedSource = undefined; this.busy = false;
+    this.unmountButton(); this.toast.hide();
+    this.sourceId = undefined; this.routeId = undefined; this.watchedSource = undefined; this.busy = false;
   }
 
   dispose() {

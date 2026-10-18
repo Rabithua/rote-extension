@@ -1,4 +1,3 @@
-import '../src/sites/page/bilibili.css';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { installPageAdapter } from '../src/sites/page/contentScript';
 import { bilibiliDefinition } from '../src/sites/page/definitions';

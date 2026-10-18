@@ -1,6 +1,7 @@
 import { send } from '../../messaging/protocol';
 import { roteIcon } from '../x/appearance';
 import type { PageDefinition } from './adapter';
+import { mountBilibiliButton } from './bilibili';
 import {
   arxivPaperId,
   bilibiliVideoId,
@@ -21,21 +22,7 @@ function button(label: string) {
 
 export const bilibiliDefinition: PageDefinition = {
   site: 'bilibili', sourceId: bilibiliVideoId, extract: async () => { const url = location.href; try { return (await send({ type: 'page:extract', site: 'bilibili', url })).capture as Awaited<ReturnType<typeof extractBilibili>>; } catch { return location.href === url ? extractBilibili() : null; } },
-  mountButton(label) {
-    const share = document.querySelector<HTMLElement>('.video-toolbar-left .video-share, .video-toolbar-left-main .video-share');
-    // Vue must hydrate the original server-rendered tree before we add siblings.
-    // Early insertion makes Bilibili rebuild its app and mount the header twice.
-    if (!share || share.closest('[data-server-rendered]')) return null;
-    const element = button(label); element.dataset.rotePage = 'bilibili';
-    element.style.cssText = 'display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;font:inherit;white-space:nowrap;padding:8px 10px';
-    element.querySelector('svg')!.setAttribute('width', '22'); element.querySelector('svg')!.setAttribute('height', '22');
-    const native = getComputedStyle(share); element.style.font = native.font; element.style.setProperty('--rote-bili-text', native.color); element.style.padding = native.padding;
-    const anchor = share.closest('.toolbar-left-item-wrap') ?? share;
-    const size = share.querySelector('svg')?.getBoundingClientRect();
-    if (size?.width) { element.querySelector('svg')!.setAttribute('width', String(size.width)); element.querySelector('svg')!.setAttribute('height', String(size.height)); element.querySelector('svg')!.style.width = `${size.width}px`; element.querySelector('svg')!.style.height = `${size.height}px`; }
-    element.style.marginLeft = getComputedStyle(anchor).marginRight;
-    anchor.insertAdjacentElement('afterend', element); return { button: element, root: element };
-  },
+  mountButton: label => mountBilibiliButton(button(label)),
 };
 
 export const hackerNewsDefinition: PageDefinition = {
