@@ -776,21 +776,23 @@ test('Bilibili replaces its portal when native toolbar rebuilds and removes it o
   await expect(page.locator('#biliMainHeader a')).toBeVisible();
 });
 
-test('Bilibili portal keeps forward and backward toolbar focus order across saving', async ({context, extensionId}) => {
+for (const focusableShare of [true, false]) {
+test(`Bilibili portal keeps forward and backward toolbar focus order across saving (${focusableShare ? 'focusable Share' : 'native div Share'})`, async ({context, extensionId}) => {
   await connect(context, extensionId); await mockPageAPIs(context);
   const runtime = await readFile(resolve('node_modules/vue/dist/vue.runtime.js'), 'utf8');
   await context.route('https://www.bilibili.com/**', route => route.fulfill({
     contentType: route.request().url().endsWith('/__fixture_vue.js') ? 'application/javascript' : 'text/html',
-    body: route.request().url().endsWith('/__fixture_vue.js') ? runtime : bilibiliHydrationFixture(),
+    body: route.request().url().endsWith('/__fixture_vue.js') ? runtime : bilibiliHydrationFixture(false, focusableShare),
   }));
   const page = await context.newPage(); await page.goto('https://www.bilibili.com/video/BV1234567890');
   const button = page.locator('[data-rote-page=bilibili]'); const share = page.locator('.video-share'); const report = page.locator('.video-toolbar-right');
+  const before = focusableShare ? share : page.locator('#biliMainHeader a');
   await expect(button).toBeVisible();
   async function expectToolbarOrder() {
-    await share.focus(); await page.keyboard.press('Tab'); await expect(button).toBeFocused();
+    await before.focus(); await page.keyboard.press('Tab'); await expect(button).toBeFocused();
     await page.keyboard.press('Tab'); await expect(report).toBeFocused();
     await page.keyboard.press('Shift+Tab'); await expect(button).toBeFocused();
-    await page.keyboard.press('Shift+Tab'); await expect(share).toBeFocused();
+    await page.keyboard.press('Shift+Tab'); await expect(before).toBeFocused();
   }
   await expectToolbarOrder();
   const worker = context.serviceWorkers()[0]!;
@@ -806,10 +808,11 @@ test('Bilibili portal keeps forward and backward toolbar focus order across savi
   });
   await button.click(); await expect(button).toBeDisabled();
   await expect.poll(() => worker.evaluate(() => typeof (globalThis as unknown as {biliReleaseCreate?: () => void}).biliReleaseCreate)).toBe('function');
-  await share.focus(); await page.keyboard.press('Tab'); await expect(report).toBeFocused();
+  await before.focus(); await page.keyboard.press('Tab'); await expect(report).toBeFocused();
   await worker.evaluate(() => { (globalThis as unknown as {biliReleaseCreate: () => void}).biliReleaseCreate(); });
   await expect(button).toHaveText('View note'); await expect(button).toBeEnabled(); await expectToolbarOrder();
 });
+}
 
 test('Bilibili button follows native hover colors and keeps saved results actionable',async({context,extensionId})=>{
   await connect(context,extensionId);await mockPageAPIs(context);

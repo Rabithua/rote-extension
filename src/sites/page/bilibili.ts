@@ -82,16 +82,13 @@ export function mountBilibiliButton(button: HTMLButtonElement): MountedPageButto
   const tab = (event: KeyboardEvent) => {
     if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey || button.disabled || root.style.visibility !== 'visible') return;
     const fromButton = event.composedPath().includes(button);
-    const fromShare = event.target instanceof Node && anchor.contains(event.target);
-    if (!fromButton && !fromShare && !event.shiftKey) return;
     const controls = Array.from(document.querySelectorAll<HTMLElement>('a[href],button,input,select,textarea,[tabindex]'))
       .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && element.checkVisibility({ checkVisibilityCSS: true }) && element.getClientRects().length);
+    const before = controls.filter(element => anchor.contains(element) || !!(element.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
     const after = controls.find(element => !anchor.contains(element) && !!(anchor.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
     let target: HTMLElement | undefined;
-    if (fromButton) target = event.shiftKey
-      ? controls.filter(element => anchor.contains(element) || !!(element.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1)
-      : after;
-    else if ((fromShare && !event.shiftKey) || (event.target === after && event.shiftKey)) target = button;
+    if (fromButton) target = event.shiftKey ? before : after;
+    else if ((!event.shiftKey && event.target === before) || (event.shiftKey && event.target === after)) target = button;
     if (target) { event.preventDefault(); target.focus(); }
   };
   document.addEventListener('keydown', tab, true);
