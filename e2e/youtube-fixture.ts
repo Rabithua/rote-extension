@@ -7,3 +7,30 @@ export function youtubeFixture(watch=false) {
   document.addEventListener('keydown',event=>{if(event.keyCode===27)document.querySelector('ytd-menu-popup-renderer')?.remove();});
   </script></body></html>`;
 }
+
+/** Native watch actions can all be icon-only, including the first Share peer. */
+export function youtubeWatchIconFixture(language:'en'|'zh',dark=false,legacy=false,mainstage=false) {
+  const host=language==='zh'?'ytSpecButtonShapeNextHost':'yt-spec-button-shape-next';
+  const modifier=(name:string)=>language==='zh'?`ytSpecButtonShapeNext${name}`:`yt-spec-button-shape-next--${name.replace(/[A-Z]/g,(letter,index)=>`${index?'-':''}${letter.toLowerCase()}`)}`;
+  const shape=`${host} ${modifier('SizeM')} ${modifier('Tonal')} ${modifier('Mono')}`;
+  const icon=(name:string)=>`<yt-button-view-model><button class="${shape} ${modifier('IconButton')}${mainstage?` ${modifier('MainstagePadding')} ${modifier('MainstageIconSize')}`:''}" aria-label="${name}"><svg viewBox="0 0 24 24" width="24" height="24"><path d="M4 4h16v16H4z" fill="currentColor"/></svg></button></yt-button-view-model>`;
+  const segmented=legacy?'ytd-segmented-like-dislike-button-renderer':'segmented-like-dislike-button-view-model';
+  const actions=`<${segmented}><button class="${shape} ${modifier('SegmentedStart')}" aria-label="Like">405</button><button class="${shape} ${modifier('SegmentedEnd')}" aria-label="Dislike">−</button></${segmented}>${icon('Share')}${icon('Ask')}`;
+  return youtubeFixture(true)
+    .replace('<html lang="en">',`<html lang="${language==='zh'?'zh-CN':'en'}">`)
+    .replace('<div id="top-level-buttons-computed"><button aria-label="Share">Share</button><button>Download</button></div>',`<div id="top-level-buttons-computed">${actions}</div>`)
+    .replace('</style>',`
+      body{background:${dark?'#0f0f0f':'white'};color:${dark?'white':'#0f0f0f'}}
+      #top-level-buttons-computed{width:380px;align-items:center}
+      #top-level-buttons-computed>yt-button-view-model{display:flex;flex:none;margin-left:8px}
+      ${segmented}{display:flex;flex:none}
+      .${host}{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;border:0;cursor:pointer}
+      .${modifier('SizeM')}{height:40px;padding:0 16px;border-radius:20px;font:500 14px/20px Arial}
+      .${modifier('Mono')}.${modifier('Tonal')}{background:${dark?'#272727':'#f2f2f2'};color:inherit}
+      .${modifier('SizeM')}.${modifier('IconButton')}{width:40px;padding:0}
+      .${modifier('SizeM')}.${modifier('MainstagePadding')}{padding:0 16px}
+      .${modifier('IconButton')}{flex:0 0 auto}
+      .${modifier('SegmentedStart')}{width:64px;border-radius:20px 0 0 20px}
+      .${modifier('SegmentedEnd')}{width:40px;border-radius:0 20px 20px 0}
+    </style>`);
+}
