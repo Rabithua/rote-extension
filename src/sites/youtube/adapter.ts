@@ -79,10 +79,20 @@ export class YouTubeAdapter implements SiteAdapter {
     if(!capture || !actions){this.watchButton?.remove();this.watchButton=undefined;this.watchId=undefined;return;}
     if(this.watchId===capture.sourceId && this.watchButton?.parentElement===actions)return;
     this.watchButton?.remove();
-    const template=Array.from(actions.querySelectorAll<HTMLButtonElement>('button')).find(el=>this.visible(el) && !el.closest('segmented-like-dislike-button-view-model') && !el.hasAttribute('aria-pressed'));
+    const template=Array.from(actions.querySelectorAll<HTMLButtonElement>('button')).find(el=>this.visible(el) && !el.closest('segmented-like-dislike-button-view-model, ytd-segmented-like-dislike-button-renderer') && !el.hasAttribute('aria-pressed'));
     if(!template)return;
     const button=document.createElement('button');button.type='button';button.className=template.className;
-    button.dataset.roteYoutube='watch';button.style.cssText='display:flex;align-items:center;gap:8px;white-space:nowrap;margin-left:8px';
+    // Keep YouTube's theme and size, but use its text-button padding instead of
+    // an icon-only circle. The complete label must also own its layout/hit area.
+    for(const [host,iconOnly,leading] of [
+      ['yt-spec-button-shape-next','yt-spec-button-shape-next--icon-button','yt-spec-button-shape-next--icon-leading'],
+      ['ytSpecButtonShapeNextHost','ytSpecButtonShapeNextIconButton','ytSpecButtonShapeNextIconLeading'],
+    ] as const){
+      if(!button.classList.contains(host))continue;
+      for(const name of [...button.classList])if(name.startsWith(iconOnly))button.classList.remove(name);
+      button.classList.add(leading);
+    }
+    button.dataset.roteYoutube='watch';button.style.cssText='display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;margin-inline-start:8px;flex:0 0 auto;width:max-content;max-width:none';
     const label=document.createElement('span');label.textContent=this.t('save');button.append(roteIcon(),label);actions.append(button);
     const id=capture.sourceId;this.watchButton=button;this.watchId=id;
     button.onclick=()=>{const fresh=extractWatch();if(!fresh || fresh.sourceId!==id){this.toast.reset();this.toast.show('youtube_unavailable');return;}this.save(fresh);};

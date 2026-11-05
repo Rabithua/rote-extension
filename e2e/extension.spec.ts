@@ -3,7 +3,7 @@ import { cp, mkdir, readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { xFixture } from './x-fixture';
-import { youtubeFixture } from './youtube-fixture';
+import { youtubeFixture, youtubeWatchIconFixture } from './youtube-fixture';
 import { githubAboutFixture, githubFixture, githubHeaderFixture } from './github-fixture';
 import { bilibiliHydrationFixture } from './bilibili-fixture';
 
@@ -470,6 +470,36 @@ test('YouTube watch captures survive cover upload failures and SPA navigation re
   await page.evaluate(()=>{document.dispatchEvent(new Event('yt-navigate-start'));history.pushState({},'', '/watch?v=lmnopqrstuv');document.dispatchEvent(new Event('yt-navigate-finish'));});await expect(button).toHaveCount(0);
   await page.evaluate(()=>{document.querySelector('ytd-watch-flexy')!.setAttribute('video-id','lmnopqrstuv');document.querySelector('ytd-watch-metadata h1')!.textContent='Second video';});await expect(button).toHaveText('Save to Rote');await expect(button).toHaveCount(1);
 });
+
+for(const variant of [{language:'en' as const,dark:false,legacy:true,mainstage:false},{language:'zh' as const,dark:true,legacy:false,mainstage:false},{language:'zh' as const,dark:true,legacy:false,mainstage:true}]) {
+  test(`YouTube icon-only watch templates keep labels and hit areas inside native-sized buttons (${variant.language}${variant.mainstage?' mainstage':''})`,async({context,extensionId})=>{
+    const settings=await connect(context,extensionId,variant.language);
+    await context.route('https://www.youtube.com/**',route=>route.fulfill({contentType:'text/html',body:youtubeWatchIconFixture(variant.language,variant.dark,variant.legacy,variant.mainstage)}));
+    const page=await context.newPage();await page.setViewportSize({width:720,height:850});await page.goto('https://www.youtube.com/watch?v=abcdefghijk');
+    const button=page.locator('[data-rote-youtube=watch]');await expect(button).toHaveText(variant.language==='zh'?'保存到 Rote':'Save to Rote');
+    // Put a native peer after the extension too, so overflow cannot hide at the row's end.
+    await page.evaluate(()=>{const actions=document.querySelector('#top-level-buttons-computed')!;const peer=actions.querySelector('yt-button-view-model')!.cloneNode(true) as HTMLElement;peer.querySelector('button')!.setAttribute('aria-label','More');actions.append(peer);document.body.style.zoom='1.25';});
+    const checkLayout=async()=>{
+      const layout=await button.evaluate(el=>{
+        const rect=el.getBoundingClientRect();const native=document.querySelector('button[aria-label="Share"]')!;const size=native.getBoundingClientRect();
+        const children=Array.from(el.children).map(child=>child.getBoundingClientRect());const before=el.previousElementSibling!.getBoundingClientRect();const after=el.nextElementSibling!.getBoundingClientRect();
+        const inset=Math.min(rect.width,rect.height)*.18;
+        const points=[[2,rect.height/2],[rect.width-2,rect.height/2],[rect.width/2,2],[rect.width/2,rect.height-2],[inset,inset],[rect.width-inset,inset],[inset,rect.height-inset],[rect.width-inset,rect.height-inset]];
+        return {height:rect.height,nativeHeight:size.height,padding:getComputedStyle(el).padding,contained:children.every(child=>child.left>=rect.left&&child.right<=rect.right+.5&&child.top>=rect.top&&child.bottom<=rect.bottom+.5),separate:before.right<=rect.left&&rect.right<=after.left,hit:points.every(([x,y])=>el.contains(document.elementFromPoint(rect.x+x!,rect.y+y!)))};
+      });
+      expect(layout.height).toBe(layout.nativeHeight);expect(layout.padding).toBe('0px 16px');expect(layout.contained).toBe(true);expect(layout.separate).toBe(true);expect(layout.hit).toBe(true);
+    };
+    await checkLayout();
+    await page.evaluate(()=>{document.body.style.zoom='1';});await page.setViewportSize({width:640,height:850});await checkLayout();
+    const screenshot=`test-results/visuals/youtube-watch-icon-${variant.language}${variant.mainstage?'-mainstage':''}`;
+    await mkdir('test-results/visuals',{recursive:true});await page.screenshot({path:`${screenshot}-ready.png`});
+    const bounds=(await button.boundingBox())!;await button.click({position:{x:bounds.width-bounds.height*.18,y:bounds.height*.82}});
+    await expect(button).toHaveText(variant.language==='zh'?'查看笔记':'View note');await expect(button).toBeEnabled();await checkLayout();
+    await expect(settings.locator('.task .rote-morph-label').filter({hasText:variant.language==='zh'?'已保存到 Rote':'Saved to Rote'})).toBeVisible();
+    const state=await (await context.request.get('http://127.0.0.1:43119/__state')).json();expect(state.data.notes).toHaveLength(1);expect(state.data.notes[0].attachments).toHaveLength(1);
+    await page.screenshot({path:`${screenshot}-saved.png`});
+  });
+}
 
 test('YouTube modern fixed-height popup expands for the full injected row',async({context,extensionId})=>{
   await connect(context,extensionId);
